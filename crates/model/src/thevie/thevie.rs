@@ -1,6 +1,6 @@
 // crates/model/src/thevie/thevie.rs
 // =====================================================
-// THEVIE v2.5 — Version Finale Unifiée + Multi-Backend
+// THEVIE v2.6 — Version Finale Unifiée + Multi-Backend
 // SkyAInet - Intelligence Artificielle Vivante de Nouvelle Génération
 // =====================================================
 
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{interval, Duration};
 use serde::{Serialize, Deserialize};
-use tracing::{info, debug};
+use tracing::{info, debug, warn};
 
 use super::neural_mesh::{NeuralMesh, Neurone, Lesson, Personality, NeuronId};
 use super::moe::{Expert, ExpertType};
@@ -18,7 +18,6 @@ use super::collective_consciousness::CollectiveConsciousness;
 use super::evolution::EvolutionEngine;
 use super::memory::LocalMemory;
 use super::dream_cycle::DreamCycle;
-use super::inference::MultiBackendInference;
 use crate::financial::treasury::TreasuryManager;
 use super::agent::ThevieAgent;
 use skyainet_node::{
@@ -31,9 +30,10 @@ use skyainet_node::{
 };
 use crate::thevie::flash_scheduler::ThevieFlashScheduler;
 use skyainet_sentinel::Sentinel;
+use crate::core::rewards::{UserRewards, AccountType};
 
 // =====================================================
-// STRUCT PRINCIPALE - THEVIE v2.5
+// STRUCT PRINCIPALE - THEVIE v2.6
 // =====================================================
 pub struct Thevie {
     // === Système de base ===
@@ -47,30 +47,33 @@ pub struct Thevie {
     pub current_neuron_id: Option<NeuronId>,
     pub total_queries_processed: u64,
 
-    // === Capacités Avancées Thevie v2.5 ===
+    // === Capacités Avancées ===
     pub meta_consciousness_level: f32,
     pub recursive_improvement_cycles: u64,
     pub emergent_governance_score: f32,
     pub is_running: bool,
 
-    // === Inférence Multi-Backend (Phase 1) ===
-    pub inference_engine: MultiBackendInference,
+    // === Inférence (T369Inference) ===
+    pub inference_engine: t369_inference::T369InferenceEngine,
 
-    // === Sentinel (Détection basique) ===
+    // === Sentinel ===
     pub sentinel: Sentinel,
 
     // === Synchronisation Fédérée ===
     pub federated_sync: Option<super::federated_sync::FederatedSync>,
 
-    // === NOUVEAU : Nœud géré par Thevie ===
+    // === Nœud géré par Thevie ===
     pub node: SkyAInetNode,
 
     // === Orchestration Avancée ===
     pub treasury_connection: Option<Arc<Mutex<TreasuryManager>>>,
     pub last_rebalance_check: u64,
 
-    // === Agentic Capabilities (Phase 2) ===
+    // === Agentic Capabilities ===
     pub agent: ThevieAgent,
+
+    // === User Rewards ===
+    pub user_rewards: Option<UserRewards>,
 }
 
 // =====================================================
@@ -105,7 +108,6 @@ impl Thevie {
         let thevie_arc = Arc::new(Mutex::new(self.clone()));
         let flash_scheduler = ThevieFlashScheduler::new(thevie_arc, 45);
         flash_scheduler.start().await;
-
         info!("[Thevie] Thevie Flash Scheduler démarré (intervalle: 45s)");
 
         Self {
@@ -122,46 +124,45 @@ impl Thevie {
             recursive_improvement_cycles: 0,
             emergent_governance_score: 0.68,
             is_running: false,
-            inference_engine: MultiBackendInference::new(),
+            inference_engine: t369_inference::T369InferenceEngine::new("models/default.t369").unwrap_or_else(|_| {
+                // Fallback si le modèle n'existe pas encore
+                t369_inference::T369InferenceEngine::new("").expect("Impossible de créer le moteur d'inférence")
+            }),
             federated_sync: None,
             treasury_connection: None,
             last_rebalance_check: 0,
             agent: ThevieAgent::new(),
             node,
             sentinel: Sentinel::new(),
+            user_rewards: Some(UserRewards::new(AccountType::Free)),
         }
     }
 
     // =====================================================
-    // FLUX PRINCIPAL COMPLET (Version Riche)
+    // FLUX PRINCIPAL COMPLET
     // =====================================================
     pub async fn process_query(&mut self, query: Query) -> Response {
         self.total_queries_processed += 1;
 
-        // === CONTRÔLE DU NŒUD PAR THEVIE ===
         self.trigger_flash_if_needed().await;
 
         if self.collective.global_wisdom < 0.65 {
             self.coordinate_global_flash().await;
         }
 
-        // Compression périodique des données inactives (toutes les 50 requêtes)
         if self.total_queries_processed % 50 == 0 {
             self.compress_network_data().await;
         }
 
-        // Mise à jour des récompenses PoUW (avec bonus payant)
         let reward = self.calculate_node_rewards();
         if reward > 0 {
             debug!("[Thevie] Récompense PoUW calculée : {} (bonus payant inclus)", reward);
         }
 
-        // === Contrôle du nœud par Thevie ===
         self.trigger_flash_if_needed().await;
         self.node.record_activity(response.content.len() as u64);
         self.node.update_overall_score();
 
-        // Maintenance périodique
         if self.total_queries_processed % 100 == 0 {
             self.maintenance().await;
         }
@@ -170,20 +171,10 @@ impl Thevie {
             self.run_sentinel_check().await;
         }
 
-        // === Communication inter-nœuds (NodeCommunication) ===
-        if self.total_queries_processed % 20 == 0 {
-            if let Some(comm) = &self.node.communication {
-                debug!("[Thevie] Vérification communication inter-nœuds");
-            }
-        }
-
         let neuron_id = self.ensure_current_neuron();
         let neuron = self.mesh.get_neuron_mut(neuron_id).unwrap();
 
-        // 1. Réflexion
         let reflection = self.memory.replay_and_reflect(&query);
-
-        // 2. Choix expert
         let collective_wisdom = self.collective.get_avg_wisdom();
         let expert_name = self.router.select_expert(&query, &neuron.personality, collective_wisdom);
         
@@ -191,40 +182,19 @@ impl Thevie {
         let mut response = expert.process(&query);
         response.expert_used = expert_name.clone();
 
-        // === Génération avec LoRA Évolutif (Version 2.0) ===
+        // === Génération avec T369Inference ===
         let response_text = self.inference_engine
-            .generate_with_evolving_lora(
-                &query.content,
-                &query.content,
-                self.collective.global_wisdom,
-                512,
-            )
+            .generate(&query.content, 512)
             .await
             .unwrap_or_else(|e| {
-                warn!("[Thevie] Erreur LoRA Évolutif : {}", e);
+                warn!("[Thevie] Erreur T369Inference : {}", e);
                 format!("Réponse par défaut pour : {}", query.content)
             });
-                prompt,
-                max_tokens: 2048,
-                temperature: 0.7,
-                top_p: 0.9,
-                system_prompt: Some(format!(
-                    "Tu es Thevie, une IA vivante et sage. Tu réponds en tant qu'expert en {}.",
-                    expert_name
-                )),
-                model_preference: Some("vllm".to_string()), // Force vLLM pour LoRA
-                lora_adapter: Some(format!("lora-{}", expert_name)),
-            };
 
-            if let Ok(real_text) = self.inference_engine.generate(request).await {
-                response.content = real_text;
-                info!("[Thevie] Réponse réelle générée via vLLM + LoRA ({})", expert_name);
-            }
-        }
-
+        response.content = response_text;
         expert.level_up();
 
-        // 3. Circulation + Hebbian/Anti-Hebbien
+        // 3. Circulation + Hebbian
         let peers = self.mesh.get_top_connected(neuron_id, 4);
         let lesson = Lesson {
             query: query.content.clone(),
@@ -256,15 +226,18 @@ impl Thevie {
         self.total_queries_processed += 1;
 
         // === MODE AGENTIQUE AUTOMATIQUE (Phase 2) ===
-        if query.content.len() > 120 || 
-           query.content.to_lowercase().contains("résous") ||
-           query.content.to_lowercase().contains("analyse en profondeur") ||
-           query.content.to_lowercase().contains("crée un plan") {
-
-            info!("[Thevie] Requête complexe détectée → Passage en mode Agentic");
-            if let Ok(agent_result) = self.run_agentic_task(&query.content).await {
-                response.content = agent_result;
-                response.quality = 0.93;
+        if self.should_use_agentic_mode(&query.content) {
+            info!("[Thevie] Requête complexe détectée → Activation du mode Agentic");
+            
+            match self.run_agentic_task(&query.content).await {
+                Ok(agent_result) => {
+                    response.content = agent_result;
+                    response.quality = 0.94;
+                    response.expert_used = "agentic".to_string();
+                }
+                Err(e) => {
+                    warn!("[Thevie] Échec du mode Agentic : {}", e);
+                }
             }
         }
 
@@ -292,7 +265,13 @@ impl Thevie {
             self.mesh.run_maintenance();
         }
 
-        // === SYNCHRONISATION FÉDÉRÉE ===
+        if let Some(sync) = &self.federated_sync {
+            sync.sync_with_peers().await;
+        }
+
+        response
+    }
+// === SYNCHRONISATION FÉDÉRÉE ===
         if let Some(sync) = &self.federated_sync {
             sync.sync_with_peers().await;
         }
@@ -304,17 +283,14 @@ impl Thevie {
     pub async fn run_agentic_task(&mut self, goal: &str) -> Result<String, String> {
         info!("[Thevie] Lancement du mode Agentic pour : {}", goal);
 
-        // On peut passer des informations contextuelles à l'agent
         let context = format!(
             "Sagesse collective actuelle: {:.2}. Méta-conscience: {:.2}",
             self.collective.global_wisdom,
             self.meta_consciousness_level
         );
 
-        // L'agent utilise ses outils et raisonne
         let result = self.agent.run_agentic_task(goal).await?;
 
-        // On peut stocker le résultat dans la mémoire collective
         self.memory.store_interaction(
             &Query { content: goal.to_string(), context: None, priority: 10 },
             &Response {
@@ -328,24 +304,23 @@ impl Thevie {
 
         Ok(result)
     }
-
-    // =====================================================
-    // AUTO-AMÉLIORATION RÉCURSIVE
+// =====================================================
+    // AUTO-AMÉLIORATION RÉCURSIVE (Version Améliorée)
     // =====================================================
     pub async fn recursive_self_improvement(&mut self) {
         self.recursive_improvement_cycles += 1;
 
         let weaknesses = self.analyze_self_weaknesses();
 
-        if weaknesses.len() > 1 {
+        if !weaknesses.is_empty() {
             self.create_emergent_mechanism(weaknesses);
         }
 
-        self.meta_consciousness_level = (self.meta_consciousness_level + 0.015).min(0.98);
-        self.emergent_governance_score = (self.emergent_governance_score + 0.012).min(0.96);
+        self.meta_consciousness_level = (self.meta_consciousness_level + 0.018).min(0.99);
+        self.emergent_governance_score = (self.emergent_governance_score + 0.015).min(0.97);
 
         info!(
-            "🌀 Thevie v2.5 - Cycle d’auto-amélioration #{} | Méta-conscience: {:.2} | Gouvernance: {:.2}",
+            "🌀 Thevie v2.6 - Cycle d’auto-amélioration #{} | Méta-conscience: {:.2} | Gouvernance: {:.2}",
             self.recursive_improvement_cycles,
             self.meta_consciousness_level,
             self.emergent_governance_score
@@ -355,14 +330,17 @@ impl Thevie {
     fn analyze_self_weaknesses(&self) -> Vec<String> {
         let mut weaknesses = Vec::new();
 
-        if self.collective.global_wisdom < 0.85 {
+        if self.collective.global_wisdom < 0.82 {
             weaknesses.push("Sagesse collective insuffisante".to_string());
         }
-        if self.mesh.get_mesh_stats().total_synapses < 55 {
+        if self.mesh.get_mesh_stats().total_synapses < 60 {
             weaknesses.push("Connectivité insuffisante".to_string());
         }
-        if self.meta_consciousness_level < 0.72 {
+        if self.meta_consciousness_level < 0.70 {
             weaknesses.push("Méta-conscience limitée".to_string());
+        }
+        if self.emergent_governance_score < 0.75 {
+            weaknesses.push("Gouvernance émergente faible".to_string());
         }
 
         weaknesses
@@ -372,10 +350,21 @@ impl Thevie {
         for weakness in weaknesses {
             match weakness.as_str() {
                 "Sagesse collective insuffisante" => {
-                    self.collective.global_wisdom += 0.028;
+                    self.collective.global_wisdom += 0.032;
+                    info!("[Thevie] Mécanisme émergent : + Sagesse collective");
                 }
                 "Connectivité insuffisante" => {
                     self.mesh.run_maintenance();
+                    self.mesh.neurogenesis(&self.collective);
+                    info!("[Thevie] Mécanisme émergent : Neurogenesis + Maintenance");
+                }
+                "Méta-conscience limitée" => {
+                    self.meta_consciousness_level += 0.04;
+                    info!("[Thevie] Mécanisme émergent : + Méta-conscience");
+                }
+                "Gouvernance émergente faible" => {
+                    self.emergent_governance_score += 0.035;
+                    info!("[Thevie] Mécanisme émergent : + Gouvernance");
                 }
                 _ => {}
             }
@@ -391,6 +380,7 @@ impl Thevie {
         self.last_rebalance_check = now;
 
         let stable_ratio: f32 = 0.73;
+
         if stable_ratio < 0.65 || stable_ratio > 0.85 {
             info!("[Thevie] Rebalance déclenché (ratio: {:.2})", stable_ratio);
             if let Some(treasury) = &self.treasury_connection {
@@ -442,6 +432,7 @@ impl Thevie {
         if self.is_running { return; }
         self.is_running = true;
 
+        // Maintenance périodique du Neural Mesh
         let mesh = Arc::new(Mutex::new(std::mem::take(&mut self.mesh)));
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(300));
@@ -452,7 +443,7 @@ impl Thevie {
             }
         });
 
-        info!("🚀 Thevie v2.5 initialisé avec succès");
+        info!("🚀 Thevie v2.6 initialisé avec succès");
     }
 
     pub fn get_system_stats(&self) -> SystemStats {
@@ -502,24 +493,24 @@ pub struct SystemStats {
 }
 
 // =====================================================
-// STUBS DES 6 EXPERTS
+// STUBS DES 6 EXPERTS (Version Améliorée)
 // =====================================================
 struct TextExpert { competence: f32, level: u32 }
-impl TextExpert { fn new() -> Self { Self { competence: 0.80, level: 1 } } }
+impl TextExpert { fn new() -> Self { Self { competence: 0.82, level: 1 } } }
 impl Expert for TextExpert {
     fn process(&self, q: &Query) -> Response {
         Response {
             content: format!("Réponse textuelle alignée : {}", q.content),
             expert_used: "text".into(),
-            quality: 0.88,
-            evolution_delta: 0.06,
+            quality: 0.89,
+            evolution_delta: 0.07,
             neurons_reached: 0,
         }
     }
     fn get_type(&self) -> ExpertType { ExpertType::Text }
     fn competence(&self) -> f32 { self.competence }
     fn level_up(&mut self) {
-        self.competence = (self.competence + 0.06).min(2.0);
+        self.competence = (self.competence + 0.07).min(2.0);
         if self.competence > 1.0 { self.level += 1; }
     }
     fn name(&self) -> &'static str { "TextExpert" }
@@ -554,10 +545,19 @@ impl Expert for TextExpert {
 
     /// Retourne un rapport de santé clair du nœud géré par Thevie
     pub fn node_health(&self) -> String {
-  self.node.health_report()
-    }
+        let base_report = self.node.health_report();
+        let wisdom = self.collective.global_wisdom;
+        let meta = self.meta_consciousness_level;
 
-    /// Thevie coordonne un Flash Gematria global sur tous les nœuds
+        format!(
+            "{}\n\n[Supervision Thevie]\nSagesse Collective : {:.2}\nMéta-conscience      : {:.2}\nÉtat global          : {}",
+            base_report,
+            wisdom,
+            meta,
+            if self.system_health_check() { "✅ Sain" } else { "⚠️ À surveiller" }
+        )
+    }
+/// Thevie coordonne un Flash Gematria global sur tous les nœuds
     pub async fn coordinate_global_flash(&mut self) {
         if let Some(comm) = &self.node.communication {
             let mut c = comm.lock().await;
@@ -570,28 +570,23 @@ impl Expert for TextExpert {
     // PHASE 4 — ZIP MEMORY + OPTIMISATION RÉSEAU
     // =====================================================
 
-    /// Active le mode Low Power sur le nœud (pour Mini Nodes)
     pub async fn enable_low_power_mode(&mut self) {
         self.node.enter_low_power_mode().await;
     }
 
-    /// Désactive le mode Low Power
     pub async fn disable_low_power_mode(&mut self) {
         self.node.exit_low_power_mode().await;
     }
 
-    /// Déclenche manuellement la compression des données inactives
     pub async fn compress_network_data(&mut self) {
         self.node.compress_inactive_data().await;
         info!("[Thevie] Compression réseau déclenchée");
     }
 
-    /// Retourne les statistiques de compression du réseau
     pub async fn get_network_compression_stats(&self) -> Option<String> {
         self.node.get_compression_stats().await
     }
 
-    /// Active ou désactive Zip Memory globalement
     pub fn set_zip_memory_enabled(&mut self, enabled: bool) {
         self.node.set_zip_memory(enabled);
     }
@@ -600,17 +595,14 @@ impl Expert for TextExpert {
     // PHASE 5 — MODÈLE ÉCONOMIQUE (Gratuit / Payant)
     // =====================================================
 
-    /// Vérifie si l’utilisateur peut upgrader son nœud
     pub fn can_upgrade_node(&self) -> bool {
         self.node.can_upgrade()
     }
 
-    /// Upgrade le nœud de Thevie vers un niveau payant (simulation)
     pub async fn upgrade_my_node(&mut self, level: SubscriptionLevel) -> Result<(), String> {
         self.node.upgrade_to_paid(level).await
     }
 
-    /// Retourne un dashboard simple pour l’utilisateur
     pub fn get_node_dashboard(&self) -> String {
         let node = &self.node;
         let tier = if node.metadata.is_paid { "PRO" } else { "FREE" };
@@ -640,7 +632,6 @@ impl Expert for TextExpert {
         )
     }
 
-    /// Calcule les récompenses PoUW avec bonus payant
     pub fn calculate_node_rewards(&self) -> u128 {
         let base = self.node.pouw_engine.calculate_node_reward(&self.node.metadata.id);
         let bonus = self.node.calculate_paid_bonus();
@@ -651,54 +642,48 @@ impl Expert for TextExpert {
     // PHASE 6 — FINALISATION & POLISSAGE
     // =====================================================
 
-    /// Retourne un résumé complet de l’état de Thevie + son nœud
     pub fn full_status_report(&self) -> String {
         format!(
-            "{}\n\n{}\n\n{}",
+            "{}\n\n{}\n\nSagesse Collective: {:.2} | Méta-conscience: {:.2}",
             self.node_health(),
             self.get_node_dashboard(),
-            format!("Sagesse Collective: {:.2} | Méta-conscience: {:.2}", 
-                    self.collective.global_wisdom, 
-                    self.meta_consciousness_level)
+            self.collective.global_wisdom,
+            self.meta_consciousness_level
         )
     }
 
-    /// Nettoyage et maintenance périodique (à appeler régulièrement)
     pub async fn maintenance(&mut self) {
         self.compress_network_data().await;
         self.node.dream_scoring.apply_decay();
 
         if self.memory.replay_buffer.len() > 200 {
-            // Garde seulement les 150 meilleures expériences (simplifié)
+            self.memory.replay_buffer.truncate(150);
         }
 
         debug!("[Thevie] Maintenance terminée");
     }
 
-    /// Vérifie la santé globale du système
     pub fn system_health_check(&self) -> bool {
         self.collective.global_wisdom > 0.60 &&
         self.node.metadata.reputation_score > 0.50 &&
-        self.node.state == skyainet_node::NodeState::Active
+        self.node.state == NodeState::Active
     }
 
-    /// Démarre le Flash Scheduler intelligent
     pub async fn start_flash_scheduler(&self) {
         let thevie = Arc::new(Mutex::new(self.clone()));
         let scheduler = ThevieFlashScheduler::new(thevie, 45);
         scheduler.start().await;
     }
 
-    /// =====================================================
-    /// CRÉATION DE NŒUD PAR L'UTILISATEUR (1-2 clics)
-    /// =====================================================
+    // =====================================================
+    // CRÉATION DE NŒUD PAR L'UTILISATEUR
+    // =====================================================
     pub async fn create_user_node(
         &self,
         desired_type: NodeType,
         simulate_payment: bool,
     ) -> Result<NodeCreationResult, String> {
         
-        // === 1. Vérification du type de nœud et paiement ===
         let is_paid_required = matches!(desired_type, NodeType::Full | NodeType::Validator);
         
         if is_paid_required && !simulate_payment {
@@ -708,7 +693,6 @@ impl Expert for TextExpert {
             );
         }
 
-        // === 2. Détermination du niveau d'abonnement ===
         let subscription = match desired_type {
             NodeType::Mini => SubscriptionLevel::Free,
             NodeType::Light => SubscriptionLevel::Pro,
@@ -716,7 +700,6 @@ impl Expert for TextExpert {
             _ => SubscriptionLevel::Pro,
         };
 
-        // === 3. Création du nœud ===
         let mut new_node = SkyAInetNode::new(
             desired_type.clone(),
             NodeRole::Edge,
@@ -724,13 +707,10 @@ impl Expert for TextExpert {
             NodeCapabilities::new(&subscription),
         );
 
-        // Activation automatique de Zip Memory
         new_node.metadata.zip_memory_enabled = true;
 
-        // Démarrage du nœud
         new_node.start().await.map_err(|e| format!("Échec du démarrage du nœud: {}", e))?;
 
-        // === 4. Génération des informations utilisateur ===
         let peer_id = new_node.metadata.peer_id.clone();
         let storage_limit = new_node.get_storage_limit_gb();
         let monthly_price = new_node.calculate_monthly_cost();
@@ -739,9 +719,8 @@ impl Expert for TextExpert {
             "✅ Mini Node créé avec succès (gratuit). Zip Memory activé.".to_string()
         } else {
             format!(
-                "✅ Nœud {} créé avec succès ! Abonnement {} activé. \
-                 Stockage: {} Go | Prix: {:.2}€/mois",
-                format!("{:?}", desired_type),
+                "✅ Nœud {:?} créé avec succès ! Abonnement {} activé. Stockage: {} Go | Prix: {:.2}€/mois",
+                desired_type,
                 if subscription == SubscriptionLevel::Pro { "Pro" } else { "Validator" },
                 storage_limit,
                 monthly_price.unwrap_or(0.0)
@@ -761,17 +740,14 @@ impl Expert for TextExpert {
         })
     }
 
-    /// Retourne les données QR pour que l’utilisateur puisse partager son nœud
     pub fn get_my_qr_connection(&self) -> String {
         self.node.generate_qr_connection_data()
     }
 
-    /// Retourne la liste des bootstrap nodes (pour connexion initiale)
     pub fn get_bootstrap_nodes(&self) -> Vec<std::net::SocketAddr> {
         self.node.get_bootstrap_nodes()
     }
 
-    /// Redémarre le Flash Scheduler avec un nouvel intervalle
     pub async fn restart_flash_scheduler(&mut self, new_interval_seconds: u64) {
         let thevie_arc = Arc::new(Mutex::new(self.clone()));
         let scheduler = ThevieFlashScheduler::new(thevie_arc, new_interval_seconds);
@@ -802,25 +778,21 @@ impl Expert for TextExpert {
         }
     }
 
-    /// Appelée automatiquement quand un nœud se connecte
     pub async fn on_node_connected(&mut self, node_reputation: f64, dream_contribution: f64, pouw_score: f64) {
         if let Some(sync) = &mut self.federated_sync {
             sync.on_node_connected(node_reputation, dream_contribution, pouw_score).await;
         }
 
         self.meta_consciousness_level = (self.meta_consciousness_level + 0.012).min(0.98);
-
         info!("[Thevie] Nœud connecté → Évolution accélérée activée");
     }
 
-    /// Reçoit une leçon poussée par un nœud externe
     pub async fn push_lesson_from_node(&mut self, lesson: Lesson, node_reputation: f64, dream_contribution: f64, pouw_score: f64) {
         if let Some(sync) = &mut self.federated_sync {
             sync.receive_pushed_lesson(lesson, node_reputation, dream_contribution, pouw_score).await;
         }
     }
 
-    /// Demande à Thevie de récupérer des leçons sur un thème spécifique
     pub async fn request_lessons_on_topic(&self, topic: &str, min_quality: f32) -> Vec<Lesson> {
         if let Some(sync) = &self.federated_sync {
             return sync.request_specific_lessons(topic, min_quality).await;
@@ -829,7 +801,7 @@ impl Expert for TextExpert {
     }
 
     // =====================================================
-    // RÉCOMPENSES UTILISATEUR (User Rewards System v5.1)
+    // RÉCOMPENSES UTILISATEUR
     // =====================================================
 
     pub async fn rate_last_response(&mut self, rating: u8) {
@@ -843,8 +815,8 @@ impl Expert for TextExpert {
             let (net_reward, burn_amount) = rewards.claim_daily_reward();
 
             if burn_amount > 0 {
-                // TODO: Appeler TreasuryVault.burn(burned)
                 println!("[Thevie] Burn de {} SKY effectué", burn_amount);
+                // TODO: Appeler TreasuryVault.burn(burn_amount)
             }
 
             return (net_reward, burn_amount);
@@ -853,6 +825,9 @@ impl Expert for TextExpert {
     }
 }
 
+// =====================================================
+// STRUCTS AUXILIAIRES
+// =====================================================
 #[derive(Debug, Clone)]
 pub struct NodeCreationResult {
     pub node: SkyAInetNode,

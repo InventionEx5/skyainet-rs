@@ -1,109 +1,63 @@
-# SkyAInet × Nikola T369
+SkyAInet x Nikola T369
 
-**SkyAInet** est une infrastructure post-quantique décentralisée pour l'IA collective, la gouvernance décentralisée et l'intelligence distribuée.
+The Living, Sovereign and Post-Quantum Artificial Intelligence
 
-Version actuelle : **v0.4.2** • Quantique T369
+License: MIT
 
----
+What is SkyAInet ?
 
-## Fonctionnalités principales
+SkyAInet is a decentralized, post-quantum and ethically aligned artificial intelligence.
 
-SkyAInet propose un ensemble complet de fonctionnalités :
+It combines Thevie (living collective intelligence), Nikola T369 (post-quantum cryptography) and Roman Neural Inference (pure Rust inference engine with Roman diffusion).
 
-- **Thevie** — Intelligence collective post-quantique (PAEVF)
-- **SkyNode** — Nœuds de calcul décentralisés (Mini / Light / Full / DreamWeaver / Validator)
-- **Dream Me** — Cycles de sagesse collective et apprentissage onirique
-- **Gouvernance** — Système de Conviction Voting et propositions décentralisées
-- **Marketplace** — Location de puissance de calcul (TFLOPS)
-- **Messagerie** — Communications chiffrées post-quantiques (Double Ratchet + RomanT369)
-- **Monitoring Avancé** — KL Divergence, Ethical Score, ZIP Memory Manager
-- **Wallet** — Gestion des clés, Device Keys, phrase BIP39
-- **Secure Transport** — Couche cryptographique complète (Nikola T369, KemT369, Gematria Hybrid)
+Main Features
 
----
+Roman Neural Inference Engine (t369-inference)
+Advanced Roman diffusion (S-Box, XOR, rotation, scaling)
+Native GGUF support without external dependencies
+GGUF to T369 converter
 
-## Démarrage rapide
+Post-Quantum Cryptography (Nikola T369)
+Secured elliptic curves
+Zero-Knowledge Proofs
+Active protection against attacks
 
-### Prérequis
+Ethical Alignment (Thevie + Alignment Kernel)
+Living AI Constitution
+Ethics-based rewards
+Decentralized governance
 
-- Rust 1.85+
-- Tauri CLI
-- (Optionnel) Python 3.10+ pour les outils IA
-
-### Installation
-
-```bash
-git clone https://github.com/skyainet/skyainet-rs.git
-cd skyainet-rs
-
-# Exécution du setup complet
-chmod +x setup.sh
-./setup.sh
-```
-
-### Lancement
-
-```bash
-# Mode développement
-cargo tauri dev
-
-# Build release
-cargo tauri build
-```
-
----
-
-## Structure du projet
-
-Le projet est organisé selon une architecture modulaire claire :
+Architecture
 
 skyainet-rs/
-├── crates/
-│   ├── core/                    # Types fondamentaux et alignement éthique
-│   ├── node/                    # Gestion des nœuds SkyAInet
-│   ├── model/                   # Thevie et intelligence collective
-│   ├── secure-transport/        # Cryptographie post-quantique (Nikola T369)
-│   ├── skyainet-inference/      # Moteur d'inférence hybride
-│   ├── memory/                  # Zip Memory + IPFS + Vector Store
-│   ├── sentinel/                # Auto-healing et protection
-│   ├── api/                     # REST + GraphQL + WebSocket
-│   ├── financial/               # Treasury et liquidité
-│   └── governance/              # DAO et Conviction Voting
-├── src-tauri/                   # Application Tauri (Backend Rust)
-├── ui/                          # Interface utilisateur (11 pages HTML)
-├── scripts/                     # Scripts de déploiement et distillation
-├── contracts/                   # Smart contracts Solidity
-├── docker/                      # Conteneurs Docker
-├── monitoring/                  # Prometheus + Grafana
-├── bindings/python/             # Bindings Python
-├── whitepaper/                  # Documentation et whitepaper
-└── Cargo.toml
+crates/
+  core/              Fundamental types + alignment
+  secure-transport/  Nikola T369 (post-quantum)
+  t369-inference/    Roman Neural Inference
+  model/             Thevie (collective intelligence)
+  node/              Node management
+  api/               GraphQL + REST + WebSocket
+  financial/         Economy and rewards
 
----
+ui/                    Web interface
+whitepaper/            Technical documentation
 
-## Pages principales de l'interface
+Quick Start
 
-L'interface utilisateur Tauri contient les pages suivantes :
+git clone https://github.com/ton-username/skyainet-rs.git
+cd skyainet-rs
 
-- **Thevie** : IA collective et alignement PAEVF
-- **SkyNode** : Gestion des nœuds de calcul
-- **index.html** : Vue d'ensemble du réseau (page d'accueil)
-- **Wallet** : Gestion des identités et clés
-- **Settings** : Configuration, sécurité, préférences
-- **Nodes** : Mes nœuds et locations
-- **Monitoring** : Métriques avancées + ZIP Memory
-- **Messaging** : Messagerie post-quantique
-- **Marketplace** : Location de puissance TFLOPS
-- **Governance** : Propositions et Conviction Voting
-- **Dream Me** : Cycles de sagesse collective
+cargo run --bin t369-inference
 
----
+License
 
-## Licence
+This project is distributed under the MIT License.
 
-Ce projet est distribué sous licence **AGPL-3.0-only**.
+Contribution
 
----
+Contributions are welcome.
+Open an issue or a pull request.
 
-**SkyAInet × Nikola T369**  
-*Une intelligence qui grandit avec nous.*
+SkyAInet - The AI that thinks, protects and evolves with humanity.
+
+Version 0.4.2 - May 2026

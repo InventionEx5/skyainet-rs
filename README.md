@@ -61,3 +61,5 @@ Open an issue or a pull request.
 SkyAInet - The AI that thinks, protects and evolves with humanity.
 
 Version 0.4.2 - May 2026
+
+This project is for research and educational purposes only. It does not constitute financial advice or an offer of securities.

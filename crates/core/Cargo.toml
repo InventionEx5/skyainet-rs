@@ -1,0 +1,12 @@
+[package]
+name = "skyainet-core"
+version.workspace = true
+edition.workspace = true
+description = "Core primitives, alignment and constitution for SkyAInet"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true

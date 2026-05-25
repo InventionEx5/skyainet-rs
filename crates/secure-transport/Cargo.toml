@@ -1,0 +1,39 @@
+[package]
+name = "skyainet-secure-transport"
+version = "0.4.2"
+edition = "2021"
+description = "Nikola T369 + SkyAInet Secure Transport Layer (KemT369 + RomanT369)"
+authors = ["SkyAInet Team"]
+license = "AGPL-3.0"
+
+[dependencies]
+# === Post-Quantum ===
+pqcrypto-mlkem = { version = "0.1", features = ["std"] }
+
+# === Classical Cryptography ===
+x25519-dalek = { version = "2.0", features = ["static_secret"] }
+
+# === Hash & Key Derivation ===
+hkdf = "0.12"
+sha2 = "0.10"
+blake3 = "1.5"
+
+# === Serialization ===
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# === Error Handling ===
+thiserror = "1.0"
+
+# === Random ===
+rand = "0.8"
+rand_core = "0.6"
+
+# === Async ===
+tokio = { version = "1.38", features = ["sync", "rt", "macros"] }
+
+# === Logging ===
+tracing = "0.1"
+
+# === Internal Crates (si besoin) ===
+# skyainet-core = { path = "../core" }

@@ -1,255 +1,150 @@
 // crates/model/src/thevie/lora_evolution.rs
 // =====================================================
-// LoraÉvo v3.2 — LoRA Évolutif Intelligent de SkyAInet
-// Version finale complète et optimisée
+// LoraÉvo v4.0 — Version Intelligente & Auto-Évolutive
+// Connectée à T369Inference + SkyNode + Apprentissage Intensif
 // =====================================================
 
-pub const LORAEVO_MODEL_NAME: &str = "LoraÉvo";
-
-use reqwest::Client;
-use serde_json::json;
+use t369_inference::T369InferenceEngine;
 use tracing::{info, warn, debug};
-use std::collections::HashMap;
-
-/// Modes de LoraÉvo
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoraÉvoMode {
-    Base,
-    Expert,
-    Guide,      // Recommandé (onboarding + aide utilisateur)
-}
-
-#[derive(Debug, Clone)]
-pub struct DynamicLoRAProfile {
-    pub ethics: f32,
-    pub dream: f32,
-    pub science: f32,
-    pub analysis: f32,
-    pub creativity: f32,
-    pub profile_string: String,
-    pub confidence: f32,
-}
+use std::collections::VecDeque;
 
 pub struct EvolvingLoRA {
-    pub current_profile: DynamicLoRAProfile,
-    pub success_history: Vec<f32>,
-    pub topic_performance: HashMap<String, f32>,
-    client: Client,
-    api_base_url: String,
-    api_key: Option<String>,
     pub model_name: String,
-    pub current_mode: LoraÉvoMode,
-    pub system_prompt: String,
+    inference_engine: Option<T369InferenceEngine>,
+    
+    // === NOUVEAU : Système d'apprentissage intensif ===
+    pub experience_memory: VecDeque<String>,      // Mémoire à court terme
+    pub long_term_memory: Vec<String>,            // Mémoire longue durée
+    pub total_interactions: u64,
+    pub evolution_score: f32,                     // Score d'évolution
+    pub learning_rate: f32,
+    pub specialization: String,                   // Domaine de spécialisation actuel
 }
 
 impl EvolvingLoRA {
-    pub fn new(api_base_url: &str, api_key: Option<String>) -> Self {
-        let mut lora = Self {
-            current_profile: DynamicLoRAProfile {
-                ethics: 0.78,
-                dream: 0.65,
-                science: 0.58,
-                analysis: 0.72,
-                creativity: 0.68,
-                profile_string: "ethics-0.78-dream-0.65-science-0.58-analysis-0.72-creativity-0.68".to_string(),
-                confidence: 0.82,
-            },
-            success_history: Vec::new(),
-            topic_performance: HashMap::new(),
-            client: Client::new(),
-            api_base_url: api_base_url.to_string(),
-            api_key,
-            model_name: LORAEVO_MODEL_NAME.to_string(),
-            current_mode: LoraÉvoMode::Guide,
-            system_prompt: String::new(),
-        };
-
-        lora.update_system_prompt();
-        lora
+    pub fn new() -> Self {
+        Self {
+            model_name: "LoraÉvo v4.0".to_string(),
+            inference_engine: None,
+            experience_memory: VecDeque::with_capacity(50),
+            long_term_memory: Vec::new(),
+            total_interactions: 0,
+            evolution_score: 0.65,
+            learning_rate: 0.035,
+            specialization: "Généraliste".to_string(),
+        }
     }
 
-    /// Met à jour le System Prompt selon le mode
-    pub fn update_system_prompt(&mut self) {
-        self.system_prompt = match self.current_mode {
-            LoraÉvoMode::Base => {
-                "Tu es LoraÉvo, un modèle LoRA évolutif intelligent.".to_string()
+    /// Connexion au moteur T369Inference
+    pub fn connect_to_inference(&mut self, engine: T369InferenceEngine) {
+        self.inference_engine = Some(engine);
+        info!("[LoraÉvo] Connecté au moteur T369Inference (v4.0)");
+    }
+
+    /// Génère une réponse intelligente avec apprentissage
+    pub async fn generate(&mut self, prompt: &str, max_tokens: u32) -> Result<String, String> {
+        if let Some(engine) = &mut self.inference_engine {
+            let enhanced_prompt = self.build_enhanced_prompt(prompt);
+
+            match engine.generate(&enhanced_prompt, max_tokens as usize).await {
+                Ok(response) => {
+                    self.learn_from_interaction(&prompt, &response);
+                    self.total_interactions += 1;
+                    self.update_evolution_score();
+
+                    info!("[LoraÉvo] Réponse générée | Évolution: {:.2} | Interactions: {}", 
+                          self.evolution_score, self.total_interactions);
+                    
+                    Ok(response)
+                }
+                Err(e) => Err(e),
             }
-            LoraÉvoMode::Expert => {
-                "Tu es LoraÉvo, un expert technique très précis et concis de SkyAInet.".to_string()
+        } else {
+            Err("LoraÉvo n'est pas connecté au moteur d'inférence".to_string())
+        }
+    }
+
+    /// Construit un prompt enrichi avec mémoire et contexte
+    fn build_enhanced_prompt(&self, prompt: &str) -> String {
+        let mut context = String::new();
+
+        // Ajoute de la mémoire récente
+        if !self.experience_memory.is_empty() {
+            context.push_str("\n[Contexte récent]:\n");
+            for exp in self.experience_memory.iter().rev().take(3) {
+                context.push_str(&format!("- {}\n", exp));
             }
-            LoraÉvoMode::Guide => {
-                "Tu es **LoraÉvo**, le guide intelligent de SkyAInet × Nikola T369. \
-                Tu es un expert complet du programme. Tu connais parfaitement toutes les fonctionnalités : \
-                Dashboard, Thevie Chat, Mes Nœuds, Marketplace, Governance, Wallet, Dream Me, Monitoring, Settings et Messaging. \
-                Tu réponds de manière claire, bienveillante et pédagogique.".to_string()
-            }
-        };
+        }
+
+        // Ajoute de la spécialisation
+        context.push_str(&format!("\n[Spécialisation actuelle] : {}\n", self.specialization));
+
+        format!(
+            "Tu es LoraÉvo v4.0, un guide intelligent et auto-évolutif de SkyAInet.\n\
+             Tu apprends continuellement et t'adaptes.\n\n\
+             {}\n\nUtilisateur : {}\nLoraÉvo :",
+            context, prompt
+        )
     }
 
-    /// Change le mode de LoraÉvo
-    pub fn set_mode(&mut self, mode: LoraÉvoMode) {
-        self.current_mode = mode;
-        self.update_system_prompt();
-        debug!("[LoraÉvo] Mode changé → {:?}", mode);
+    /// Apprentissage intensif après chaque interaction
+    fn learn_from_interaction(&mut self, prompt: &str, response: &str) {
+        // Stocke dans la mémoire courte
+        self.experience_memory.push_back(format!("Q: {} | R: {}", prompt, response));
+        if self.experience_memory.len() > 50 {
+            self.experience_memory.pop_front();
+        }
+
+        // Analyse de la qualité de la réponse (simulation)
+        let quality = self.estimate_response_quality(response);
+        
+        // Mise à jour du score d'évolution
+        if quality > 0.75 {
+            self.evolution_score = (self.evolution_score + 0.008).min(0.99);
+        }
+
+        // Adaptation de la spécialisation
+        if prompt.to_lowercase().contains("technique") || prompt.to_lowercase().contains("code") {
+            self.specialization = "Technique & Développement".to_string();
+        } else if prompt.to_lowercase().contains("éthique") || prompt.to_lowercase().contains("philosoph") {
+            self.specialization = "Éthique & Philosophie".to_string();
+        } else if prompt.to_lowercase().contains("créatif") || prompt.to_lowercase().contains("rêve") {
+            self.specialization = "Créativité & Rêves".to_string();
+        }
     }
 
-    /// Génère un profil LoRA dynamique
-    pub fn generate_dynamic_profile(&mut self, collective_wisdom: f32, query: &str) -> DynamicLoRAProfile {
-        let mut profile = self.current_profile.clone();
-        let query_lower = query.to_lowercase();
-
-        if collective_wisdom < 0.70 {
-            profile.ethics = (profile.ethics + 0.10).min(0.96);
-        }
-
-        if query_lower.contains("rêve") || query_lower.contains("créatif") || query_lower.contains("dream") {
-            profile.dream = (profile.dream + 0.16).min(0.96);
-            profile.creativity = (profile.creativity + 0.14).min(0.96);
-        }
-
-        if query_lower.contains("science") || query_lower.contains("analyse") || query_lower.contains("technique") {
-            profile.science = (profile.science + 0.13).min(0.96);
-            profile.analysis = (profile.analysis + 0.11).min(0.96);
-        }
-
-        if query_lower.contains("éthique") || query_lower.contains("moral") || query_lower.contains("bienveillant") {
-            profile.ethics = (profile.ethics + 0.09).min(0.96);
-        }
-
-        profile.profile_string = format!(
-            "ethics-{:.2}-dream-{:.2}-science-{:.2}-analysis-{:.2}-creativity-{:.2}",
-            profile.ethics, profile.dream, profile.science, profile.analysis, profile.creativity
-        );
-
-        profile.confidence = (0.78 + (collective_wisdom * 0.18)).min(0.98);
-        self.current_profile = profile.clone();
-
-        profile
+    /// Estimation simple de la qualité de réponse
+    fn estimate_response_quality(&self, response: &str) -> f32 {
+        let length_score = (response.len() as f32 / 600.0).min(1.0);
+        let keyword_score = if response.contains("SkyAInet") || response.contains("décentralisé") { 0.15 } else { 0.0 };
+        
+        (length_score * 0.7 + keyword_score).clamp(0.3, 0.95)
     }
 
-    /// Appel API avec LoRA
-    pub async fn generate_with_lora(
-        &self,
-        prompt: &str,
-        profile: &DynamicLoRAProfile,
-        max_tokens: u32,
-    ) -> Result<String, String> {
-        let body = json!({
-            "prompt": prompt,
-            "lora": profile.profile_string,
-            "max_tokens": max_tokens,
-            "temperature": 0.72
-        });
-
-        let mut request = self.client
-            .post(&format!("{}/v1/completions", self.api_base_url))
-            .json(&body);
-
-        if let Some(key) = &self.api_key {
-            request = request.bearer_auth(key);
+    /// Mise à jour du score d'évolution
+    fn update_evolution_score(&mut self) {
+        if self.total_interactions % 20 == 0 {
+            self.evolution_score = (self.evolution_score + 0.012).min(0.99);
+            self.learning_rate = (self.learning_rate * 1.02).min(0.08);
         }
-
-        let response = request.send().await.map_err(|e| format!("LoRA API error: {}", e))?;
-
-        if !response.status().is_success() {
-            return Err(format!("API error: {}", response.text().await.unwrap_or_default()));
-        }
-
-        let result: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-        Ok(result["choices"][0]["text"].as_str().unwrap_or("Réponse vide").to_string())
     }
 
-    /// Méthode principale
-    pub async fn generate(
+    /// Méthode principale (compatible avec l'ancien appel)
+    pub async fn generate_with_context(
         &mut self,
         prompt: &str,
-        query: &str,
-        collective_wisdom: f32,
+        _query: &str,
+        _collective_wisdom: f32,
         max_tokens: u32,
     ) -> Result<String, String> {
-        let profile = self.generate_dynamic_profile(collective_wisdom, query);
-        let query_lower = query.to_lowercase();
-
-        // === Mode Guide intelligent ===
-        if self.current_mode == LoraÉvoMode::Guide &&
-           (query_lower.contains("comment") || query_lower.contains("ouvrir") || query_lower.contains("utiliser") ||
-            query_lower.contains("lancer") || query_lower.contains("wallet") || query_lower.contains("gouvernance") ||
-            query_lower.contains("dream") || query_lower.contains("marketplace") || query_lower.contains("nœud") ||
-            query_lower.contains("staking") || query_lower.contains("location") || query_lower.contains("zip")) {
-
-            return Ok(self.generate_skyainet_usage_response(query));
-        }
-
-        let full_prompt = format!(
-            "{}\n\nUtilisateur : {}\nLoraÉvo :",
-            self.system_prompt,
-            prompt
-        );
-
-        match self.generate_with_lora(&full_prompt, &profile, max_tokens).await {
-            Ok(response) => {
-                info!("[LoraÉvo] Réponse générée (mode: {:?}, confiance: {:.0}%)", self.current_mode, profile.confidence * 100.0);
-                Ok(response)
-            }
-            Err(e) => {
-                warn!("[LoraÉvo] Échec API → fallback local: {}", e);
-                Ok(format!(
-                    "[LoraÉvo • {} | Confiance: {:.0}%]\n{}",
-                    profile.profile_string,
-                    profile.confidence * 100.0,
-                    prompt
-                ))
-            }
-        }
+        self.generate(prompt, max_tokens).await
     }
 
-    /// Réponses intelligentes sur SkyAInet
-    fn generate_skyainet_usage_response(&self, query: &str) -> String {
-        let q = query.to_lowercase();
-
-        if q.contains("ouvrir") && q.contains("wallet") {
-            return "Pour ouvrir ton **Wallet** :\n→ Clique sur l’icône Wallet dans la sidebar ou tape `openWindow('wallet')`.\nTu peux y staker, unstaker, envoyer et recevoir des SKY.".to_string();
-        }
-
-        if q.contains("lancer") && (q.contains("dream") || q.contains("cycle")) {
-            return "Pour lancer un **Dream Cycle** :\n→ Ouvre la fenêtre **Dream Me** ou clique sur 'Lancer Dream Cycle' dans le Dashboard.".to_string();
-        }
-
-        if q.contains("gouvernance") || q.contains("proposition") {
-            return "Pour accéder à la **Gouvernance** :\n→ Ouvre la fenêtre **Gouvernance**.\nTu peux créer des propositions, voter avec conviction et suivre les votes.".to_string();
-        }
-
-        if q.contains("marketplace") || q.contains("louer") || q.contains("puissance") {
-            return "Le **Marketplace** te permet de louer ou de louer ta puissance de calcul.\nOuvre la fenêtre **Marketplace** pour voir les offres ou publier la tienne.".to_string();
-        }
-
-        if q.contains("nœud") || q.contains("node") {
-            return "Pour gérer tes **Nœuds** :\n→ Ouvre **Mes Nœuds**.\nTu peux upgrader ton tier, mettre en location et voir tes récompenses PoUW.".to_string();
-        }
-
-        if q.contains("thevie") || q.contains("chat") {
-            return "Tu es déjà dans le chat **Thevie** !\nTu peux sélectionner **LoraÉvo** dans le sélecteur d’IA pour des réponses encore plus précises.".to_string();
-        }
-
-        if q.contains("staking") || q.contains("stake") {
-            return "Pour **staker** des SKY :\n→ Ouvre ton Wallet → Clique sur 'Stake' → Choisis le montant.\nAPY ≈ 18.4%.".to_string();
-        }
-
-        if q.contains("zip") || q.contains("mémoire") {
-            return "Le **ZIP Memory** permet de compresser intelligemment tes données locales.\nVa dans **Monitoring** → section ZIP Memory.".to_string();
-        }
-
-        "Je suis **LoraÉvo**, le guide intelligent de SkyAInet.\nJe peux t’aider sur toutes les fonctionnalités du programme.\nQue veux-tu savoir ?".to_string()
-    }
-
-    /// Apprentissage
-    pub fn learn_from_result(&mut self, wisdom_before: f32, wisdom_after: f32, query_type: &str) {
-        let improvement = wisdom_after - wisdom_before;
-
-        if improvement > 0.03 {
-            self.success_history.push(improvement);
-            self.current_profile.ethics = (self.current_profile.ethics + 0.015).min(0.96);
-            debug!("[LoraÉvo] Apprentissage positif sur '{}'", query_type);
-        }
+    /// Retourne l'état actuel de LoraÉvo
+    pub fn get_status(&self) -> String {
+        format!(
+            "LoraÉvo v4.0 | Évolution: {:.2} | Interactions: {} | Spécialisation: {}",
+            self.evolution_score, self.total_interactions, self.specialization
+        )
     }
 }

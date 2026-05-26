@@ -1,0 +1,9 @@
+[package]
+name = "t369-inference"
+version = "0.1.0"
+edition = "2021"
+authors = ["SkyAInet Team"]
+description = "T369Inference - Roman Neural Inference Engine"
+
+[dependencies]
+tracing = "0.1"

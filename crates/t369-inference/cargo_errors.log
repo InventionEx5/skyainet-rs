@@ -1,0 +1,10 @@
+warning: unused manifest key: package.ahash
+warning: unused manifest key: package.tracing
+   Compiling t369-inference v0.1.0 (/data/data/com.termux/files/home/skyainet-rs/crates/t369-inference)
+error: expected one of `!` or `::`, found `15`
+ --> src/lib.rs:1:7
+  |
+1 | total 15
+  |       ^^ expected one of `!` or `::`
+
+error: could not compile `t369-inference` (lib) due to 1 previous error

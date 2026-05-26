@@ -1,13 +1,14 @@
-# Build artifacts
+# === Rust / Cargo ===
 target/
 Cargo.lock
 *.log
 
-# IDE
+# === IDE ===
 .idea/
 .vscode/
 *.swp
+*.swo
 
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db

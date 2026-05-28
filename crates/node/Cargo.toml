@@ -1,0 +1,44 @@
+[package]
+name = "skyainet-node"
+version = "0.4.2"
+edition = "2021"
+authors = ["SkyAInet Team"]
+description = "SkyAInet Node — Core node types and management (Compute, Storage, Validator, Mixed, etc.)"
+license = "AGPL-3.0"
+repository = "https://github.com/InventionEx5/skyainet-rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.38", features = ["full"] }
+
+# Logging & Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time & Date
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.8", features = ["v4"] }
+
+# Database & Storage
+sled = "0.34"
+zstd = "0.13"
+
+# Internal dependencies (workspace)
+skyainet-core = { path = "../core" }
+secure-transport = { path = "../secure-transport" }
+t369-inference = { path = "../t369-inference" }
+skyainet-memory = { path = "../memory" }
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = []
+t369 = []           # Active les fonctionnalités T369 spécifiques
+full-crypto = []    # Active tous les modules de chiffrement avancés

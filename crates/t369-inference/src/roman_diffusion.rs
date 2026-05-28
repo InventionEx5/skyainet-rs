@@ -1,105 +1,139 @@
-// crates/t369-inference/src/transformer_block.rs
+// crates/t369-inference/src/roman_diffusion.rs
 // =====================================================
-// TransformerBlock v4.0 — ULTRA-PUISSANT
-// RMSNorm + Roman Dream Attention (GQA + MHLA) + MoE + RomanDiffusion Ultra
+// RomanDiffusion v4.0 — ULTRA-PUISSANTE
+// S-Box Romaine + Diffusion Multi-Phase + Adaptive Weights + Latent Integration
 // =====================================================
 
-use crate::roman_attention::{RomanAttention, RomanAttentionConfig};
-use crate::moe::{MoELayer, MoEConfig};
-use crate::roman_diffusion::RomanDiffusion;
-use tracing::debug;
+use std::f32::consts::PI;
 
 #[derive(Debug, Clone)]
-pub struct TransformerBlock {
-    pub attention: RomanAttention,
-    pub norm1: Vec<f32>,           // RMSNorm weights
-    pub norm2: Vec<f32>,           // RMSNorm weights
-    pub moe_layer: MoELayer,       // ← MoE (remplace SwiGLU)
-    pub roman_diffusion: RomanDiffusion,
-    pub hidden_size: usize,
+pub struct RomanDiffusion {
+    // Poids romains adaptatifs (I, V, X, L, C, D, M)
+    base_weights: [f32; 7],
+    phase: f32,
+    layer_factor: f32,
+    depth_boost: f32,           // Boost pour couches profondes
+    chaos_intensity: f32,       // Intensité du mode chaotique
+    latent_influence: f32,      // Influence de l'espace latent (MHLA)
 }
 
-impl TransformerBlock {
-    pub fn new(hidden_size: usize, num_query_heads: usize, num_kv_heads: usize, head_dim: usize) -> Self {
-        let attention = RomanAttention::new(RomanAttentionConfig {
-            num_query_heads,
-            num_kv_heads,
-            head_dim,
-            latent_dim: 32,
-            diffusion_strength: 0.38,
-            max_seq_len: 32768,
-            rope_base: 10000.0,
-            rope_scaling: 1.0,
-            use_flash: true,
-            use_mhla: true,
-        });
-
-        let moe_layer = MoELayer::new(MoEConfig {
-            num_experts: 8,
-            top_k: 2,
-            hidden_size,
-            intermediate_size: hidden_size * 4,
-        });
-
+impl RomanDiffusion {
+    pub fn new() -> Self {
         Self {
-            attention,
-            norm1: vec![1.0; hidden_size],
-            norm2: vec![1.0; hidden_size],
-            moe_layer,
-            roman_diffusion: RomanDiffusion::new(),
-            hidden_size,
+            base_weights: [1.0, 5.0, 10.0, 50.0, 100.0, 200.0, 250.0],
+            phase: 0.0,
+            layer_factor: 1.0,
+            depth_boost: 1.0,
+            chaos_intensity: 0.012,
+            latent_influence: 0.38,
         }
     }
 
-    /// Forward pass ultra-puissant
-    #[inline]
-    pub fn forward(&mut self, hidden: &mut [f32], seq_len: usize, layer_idx: usize) {
-        let hidden_size = self.hidden_size;
+    /// Version **ULTRA-PUISSANTE** (recommandée)
+    pub fn apply_ultra(
+        &mut self,
+        hidden: &[f32],
+        position: usize,
+        layer: usize,
+        latent_context: Option<&[f32]>, // Optionnel : contexte latent (MHLA)
+    ) -> Vec<f32> {
+        let mut output = Vec::with_capacity(hidden.len());
+        self.phase += 0.009;
+        self.layer_factor = 1.0 + (layer as f32 * 0.028);
+        self.depth_boost = if layer >= 8 { 1.018 } else { 1.0 };
 
-        // === 1. Pre-Norm + Roman Dream Attention (GQA + MHLA + RoPE) ===
-        let mut normed = self.rms_norm(hidden);
-        let attn_out = self.attention.forward(&normed, &normed, &normed, seq_len);
+        for (i, &value) in hidden.iter().enumerate() {
+            let roman_idx = (i + position + layer) % 7;
+            let mut weight = self.base_weights[roman_idx] * self.layer_factor;
 
-        // Residual
-        for i in 0..hidden.len() {
-            hidden[i] += attn_out[i];
+            // === Influence latente (MHLA) ===
+            if let Some(latent) = latent_context {
+                let latent_val = latent[i % latent.len()];
+                weight += latent_val * self.latent_influence * 0.1;
+            }
+
+            // === Roman S-Box Ultra ===
+            let sboxed = self.roman_sbox_ultra(value, weight, i + position + layer);
+
+            // === Diffusion Multi-Opération Romaine ===
+            let diffused = match (i + position + layer) % 9 {
+                0 => sboxed - weight * 0.011,                              // Soustractif pur
+                1 => sboxed + weight * 0.011,                              // Additif pur
+                2 => self.roman_xor_ultra(sboxed, weight),                 // XOR romain renforcé
+                3 => sboxed * (1.0 + weight * 0.0009),                     // Scaling romain
+                4 => self.roman_rotate_ultra(sboxed, weight as i32),       // Rotation romaine
+                5 => self.roman_hybrid_ultra(sboxed, weight, self.phase),  // Hybride phase
+                6 => self.roman_chaotic_ultra(sboxed, weight, i),          // Chaotique renforcé
+                7 => self.roman_spiral(sboxed, weight, position),          // Mode spirale romaine
+                _ => self.roman_quantum(sboxed, weight, layer),            // Mode "quantique" romain
+            };
+
+            // === Normalisation + Clamping + Depth Boost ===
+            let normalized = (diffused * self.depth_boost).clamp(-14.0, 14.0) * 0.97;
+            output.push(normalized);
         }
 
-        // === 2. Pre-Norm + MoE (remplace SwiGLU) ===
-        normed = self.rms_norm(hidden);
-        let mlp_out = self.moe_layer.forward(&normed);
-
-        // Residual
-        for i in 0..hidden.len() {
-            hidden[i] += mlp_out[i];
-        }
-
-        // === 3. RomanDiffusion Ultra (post-processing puissant) ===
-        let diffused = self.roman_diffusion.apply_ultra(hidden, seq_len, layer_idx, None);
-
-        for i in 0..hidden.len() {
-            hidden[i] = diffused[i];
-        }
-
-        debug!("[TransformerBlock] Layer {} processed (MoE + RomanDiffusion Ultra)", layer_idx);
+        output
     }
 
-    /// RMSNorm optimisé
-    #[inline]
-    fn rms_norm(&self, x: &[f32]) -> Vec<f32> {
-        let eps = 1e-6;
-        let mut normed = x.to_vec();
-        let mut sum = 0.0;
+    // =====================================================
+    // FONCTIONS ULTRA (améliorées)
+    // =====================================================
 
-        for &val in x.iter() {
-            sum += val * val;
-        }
-        let rms = (sum / x.len() as f32 + eps).sqrt();
+    #[inline(always)]
+    fn roman_sbox_ultra(&self, value: f32, weight: f32, seed: usize) -> f32 {
+        let x = value + (weight * 0.0012);
+        let sin1 = (x * 4.1 + seed as f32 * 0.37).sin() * 0.18;
+        let sin2 = (x * 1.9).sin() * 0.09;
+        let cos1 = (x * 2.7).cos() * 0.07;
+        x + sin1 + sin2 + cos1
+    }
 
-        for val in normed.iter_mut() {
-            *val /= rms;
-        }
+    #[inline(always)]
+    fn roman_xor_ultra(&self, value: f32, weight: f32) -> f32 {
+        let bits = value.to_bits();
+        let w = (weight * 1371.0) as u32;
+        let xored = bits ^ w ^ (bits.rotate_right(7));
+        (xored as f32) * 0.00000009 + value * 0.998
+    }
 
-        normed
+    #[inline(always)]
+    fn roman_rotate_ultra(&self, value: f32, shift: i32) -> f32 {
+        let bits = value.to_bits();
+        let rotated = bits.rotate_left((shift as u32 + 11) % 29);
+        (rotated as f32) * 0.00000008 + value * 0.997
+    }
+
+    #[inline(always)]
+    fn roman_hybrid_ultra(&self, value: f32, weight: f32, phase: f32) -> f32 {
+        let phase_mod = ((phase * 1.3) + (weight * 0.013)).sin() * 0.6 + 0.4;
+        value * (1.0 + weight * 0.0005 * phase_mod) 
+            + (weight * 0.0028) * phase_mod 
+            + (value * 0.0003).sin() * 0.4
+    }
+
+    #[inline(always)]
+    fn roman_chaotic_ultra(&self, value: f32, weight: f32, seed: usize) -> f32 {
+        let chaos = ((seed as f32 * 0.41).sin() * self.chaos_intensity) 
+                  + ((seed as f32 * 0.19).cos() * self.chaos_intensity * 0.7);
+        value + chaos - (value * 0.0012)
+    }
+
+    #[inline(always)]
+    fn roman_spiral(&self, value: f32, weight: f32, position: usize) -> f32 {
+        let spiral = ((position as f32 * 0.27).sin() * 0.5 + 0.5) * weight * 0.0006;
+        value * (1.0 + spiral) + (value * 0.0008).cos() * 0.3
+    }
+
+    #[inline(always)]
+    fn roman_quantum(&self, value: f32, weight: f32, layer: usize) -> f32 {
+        let q = (layer as f32 * 0.11).sin() * 0.4 + 0.6;
+        value * q + (weight * 0.0018) * (1.0 - q)
+    }
+
+    pub fn reset(&mut self) {
+        self.phase = 0.0;
+        self.layer_factor = 1.0;
+        self.depth_boost = 1.0;
     }
 }

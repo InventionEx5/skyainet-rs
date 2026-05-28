@@ -2,7 +2,7 @@
 // =====================================================
 // SHA-256 + HKDF-SHA256 (FIPS 140-3)
 // Version Finale — SkyAInet × Nikola T369
-// Remplace ChaCha20 par GematriaAead (post-quantique ready)
+// GematriaAead (post-quantique ready)
 // =====================================================
 
 use sha2::{Sha256, Digest};

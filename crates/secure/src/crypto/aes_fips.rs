@@ -20,6 +20,8 @@ pub enum AesError {
     InvalidKeyLength,
     #[error("Invalid nonce length")]
     InvalidNonceLength,
+    #[error("HKDF key derivation failed")]
+    HkdfExpandFailed,
 }
 
 /// AES-256-GCM conforme FIPS 140-3
@@ -66,13 +68,15 @@ impl Aes256GcmFips {
             .map_err(|_| AesError::DecryptionFailed)
     }
 
-    /// Génère une clé AES-256 dérivée via HKDF (recommandé)
-    pub fn derive_key(root_key: &[u8; 32], info: &[u8]) -> [u8; 32] {
+    /// Génère une clé AES-256 dérivée via HKDF (avec gestion d’erreur)
+    pub fn derive_key(root_key: &[u8; 32], info: &[u8]) -> Result<[u8; 32], AesError> {
         let hk = Hkdf::<Sha256>::new(Some(b"T369-AES-KEY"), root_key);
         let mut aes_key = [0u8; 32];
+
         hk.expand(info, &mut aes_key)
-            .expect("HKDF expand failed for AES key");
-        aes_key
+            .map_err(|_| AesError::HkdfExpandFailed)?;
+
+        Ok(aes_key)
     }
 }
 

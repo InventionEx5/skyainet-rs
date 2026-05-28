@@ -1,0 +1,204 @@
+// crates/model/src/thevie/replication_manager.rs
+// =====================================================
+// Replication Manager v5.2 — Synchronisation Fédérée Sécurisée
+// Version finale optimisée et robuste
+// =====================================================
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::{info, debug, warn};
+use thiserror::Error;
+
+use crate::thevie::neural_mesh::{NeuralMesh, Lesson};
+use skyainet_secure_transport::crypto::gematria::dynamic::{GematriaDynamic, GematriaMode};
+use skyainet_secure_transport::transport::Transport;
+
+#[derive(Error, Debug)]
+pub enum ReplicationError {
+    #[error("Instance not found: {0}")]
+    InstanceNotFound(String),
+    #[error("Encryption failed: {0}")]
+    EncryptionFailed(String),
+    #[error("Broadcast failed: {0}")]
+    BroadcastFailed(String),
+    #[error("Maximum number of instances reached")]
+    MaxInstancesReached,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplicationStats {
+    pub total_syncs: u64,
+    pub lessons_propagated: u64,
+    pub failed_broadcasts: u64,
+    pub last_sync: Option<u64>,
+    pub active_instances: usize,
+    pub total_data_transferred_bytes: u64,
+}
+
+pub struct ReplicationManager {
+    pub instances: HashMap<String, String>,
+    pub replication_enabled: bool,
+    pub parent_instance_id: Option<String>,
+    pub max_instances: usize,
+    transport: Option<Arc<dyn Transport + Send + Sync>>,
+    gematria: GematriaDynamic,
+    stats: ReplicationStats,
+}
+
+impl ReplicationManager {
+    pub fn new(parent_instance_id: Option<String>) -> Self {
+        Self {
+            instances: HashMap::new(),
+            replication_enabled: true,
+            parent_instance_id,
+            max_instances: 12,
+            transport: None,
+            gematria: GematriaDynamic::new([0x42u8; 32], [0u8; 12], GematriaMode::Extended95),
+            stats: ReplicationStats {
+                total_syncs: 0,
+                lessons_propagated: 0,
+                failed_broadcasts: 0,
+                last_sync: None,
+                active_instances: 0,
+                total_data_transferred_bytes: 0,
+            },
+        }
+    }
+
+    pub fn with_transport(mut self, transport: Arc<dyn Transport + Send + Sync>) -> Self {
+        self.transport = Some(transport);
+        self
+    }
+
+    pub fn create_instance(&mut self, instance_name: Option<String>) -> Result<String, ReplicationError> {
+        if !self.replication_enabled {
+            return Err(ReplicationError::BroadcastFailed("Replication disabled".to_string()));
+        }
+
+        if self.instances.len() >= self.max_instances {
+            return Err(ReplicationError::MaxInstancesReached);
+        }
+
+        let parent = self.parent_instance_id.clone().unwrap_or_else(|| "thevie".to_string());
+        let new_instance = instance_name.unwrap_or_else(|| {
+            format!("{}-clone-{}", parent, self.instances.len() + 1)
+        });
+
+        let peer_id = format!("peer-{}", uuid::Uuid::new_v4().to_string()[..12].to_string());
+        self.instances.insert(new_instance.clone(), peer_id.clone());
+        self.stats.active_instances = self.instances.len();
+
+        info!(
+            "[ReplicationManager] Instance créée : {} (PeerID: {}) — Total: {}",
+            new_instance, peer_id, self.instances.len()
+        );
+
+        Ok(new_instance)
+    }
+
+    pub fn remove_instance(&mut self, instance_id: &str) -> bool {
+        if self.instances.remove(instance_id).is_some() {
+            self.stats.active_instances = self.instances.len();
+            info!("[ReplicationManager] Instance supprimée : {}", instance_id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Synchronisation fédérée optimisée et robuste
+    pub async fn sync_all_instances(&mut self, mesh: &NeuralMesh) {
+        if !self.replication_enabled || self.instances.is_empty() {
+            return;
+        }
+
+        let high_quality_lessons: Vec<Lesson> = mesh
+            .get_all_lessons()
+            .into_iter()
+            .filter(|l| l.quality >= 0.85)
+            .take(50)
+            .collect();
+
+        if high_quality_lessons.is_empty() {
+            return;
+        }
+
+        info!(
+            "[ReplicationManager] Synchronisation de {} leçons vers {} instances...",
+            high_quality_lessons.len(),
+            self.instances.len()
+        );
+
+        for (instance_id, peer_id) in self.instances.clone() {
+            for lesson in &high_quality_lessons {
+                match self.sync_lesson_to_instance(&instance_id, &peer_id, lesson).await {
+                    Ok(bytes) => {
+                        self.stats.lessons_propagated += 1;
+                        self.stats.total_data_transferred_bytes += bytes as u64;
+                    }
+                    Err(e) => {
+                        self.stats.failed_broadcasts += 1;
+                        warn!("[ReplicationManager] Échec vers {} : {}", instance_id, e);
+                    }
+                }
+            }
+        }
+
+        self.stats.total_syncs += 1;
+        self.stats.last_sync = Some(crate::utils::now_millis());
+    }
+
+    async fn sync_lesson_to_instance(
+        &self,
+        instance_id: &str,
+        peer_id: &str,
+        lesson: &Lesson,
+    ) -> Result<usize, ReplicationError> {
+        let serialized = serde_json::to_vec(lesson)
+            .map_err(|e| ReplicationError::EncryptionFailed(e.to_string()))?;
+
+        let encrypted = self.gematria.encrypt(&serialized);
+        let encrypted_len = encrypted.len();
+
+        if let Some(transport) = &self.transport {
+            transport
+                .broadcast("skyainet/replication", &encrypted)
+                .await
+                .map_err(|e| ReplicationError::BroadcastFailed(e.to_string()))?;
+
+            debug!(
+                "[ReplicationManager] Leçon diffusée → {} ({} octets, qualité: {:.2})",
+                instance_id, encrypted_len, lesson.quality
+            );
+        } else {
+            debug!(
+                "[ReplicationManager] [LOCAL] Leçon prête ({} octets)",
+                encrypted_len
+            );
+        }
+
+        Ok(encrypted_len)
+    }
+
+    pub fn get_stats(&self) -> ReplicationStats {
+        self.stats.clone()
+    }
+
+    pub fn get_instance_count(&self) -> usize {
+        self.instances.len()
+    }
+
+    pub fn can_replicate(&self) -> bool {
+        self.replication_enabled && self.instances.len() < self.max_instances
+    }
+
+    pub fn list_instances(&self) -> Vec<String> {
+        self.instances.keys().cloned().collect()
+    }
+}
+
+impl Default for ReplicationManager {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}

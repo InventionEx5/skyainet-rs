@@ -1,0 +1,43 @@
+[package]
+name = "skyainet-memory"
+version = "0.4.2"
+edition = "2021"
+authors = ["SkyAInet Team"]
+description = "SkyAInet Memory — Intelligent Decentralized Storage (ZipMemory + IPFS + Vector Store)"
+license = "AGPL-3.0"
+repository = "https://github.com/InventionEx5/skyainet-rs"
+
+[dependencies]
+# Async & Runtime
+tokio = { version = "1.38", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time & Date
+chrono = { version = "0.4", features = ["serde"] }
+
+# Compression
+zstd = "0.13"
+
+# HTTP Client (pour IPFS)
+reqwest = { version = "0.12", features = ["multipart", "json"] }
+
+# UUID
+uuid = { version = "1.8", features = ["v4"] }
+
+# Internal dependencies (workspace)
+secure-transport = { path = "../secure-transport" }
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = []
+full-ipfs = []           # Active toutes les fonctionnalités IPFS
+vector-search = []       # Active le VectorStore complet
+cache-only = []          # Mode léger (seulement ZipMemory + cache)

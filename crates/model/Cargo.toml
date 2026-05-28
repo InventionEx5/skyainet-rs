@@ -1,0 +1,41 @@
+[package]
+name = "skyainet-model"
+version = "0.4.2"
+edition = "2021"
+authors = ["SkyAInet Team"]
+description = "SkyAInet Model — Thevie, Neural Mesh, Dream Scoring, Collective Intelligence & Evolution Engine"
+license = "AGPL-3.0"
+repository = "https://github.com/InventionEx5/skyainet-rs"
+
+[dependencies]
+# Async & Runtime
+tokio = { version = "1.38", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time & Date
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.8", features = ["v4"] }
+
+# Internal dependencies (workspace)
+skyainet-core = { path = "../core" }
+skyainet-node = { path = "../node" }
+t369-inference = { path = "../t369-inference" }
+secure-transport = { path = "../secure-transport" }
+skyainet-memory = { path = "../memory" }
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = []
+full-evolution = ["t369-inference/full"]   # Active toutes les fonctionnalités d'évolution + inference
+thevie-only = []                          # Mode léger sans inference lourde
+dream-only = []                           # Uniquement le système Dream + Collective Wisdom

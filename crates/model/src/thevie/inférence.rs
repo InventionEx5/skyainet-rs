@@ -1,123 +1,140 @@
 // crates/model/src/thevie/inference.rs
 // =====================================================
-// Hybrid Inference Engine - Thevie v4.1 (Version Complète)
-// Compatible avec T369Inference (Roman Neural Inference)
+// Thevie Inference Engine v5.0 — Version Finale
+// Pont intelligent entre Thevie et T369Inference
 // =====================================================
 
-use t369_inference::T369InferenceEngine;
-use tracing::{info, warn};
+use t369_inference::T369Inference;
+use tracing::{info, warn, debug};
 
 /// Moteur d'inférence hybride de Thevie
-pub struct HybridInferenceEngine {
-    engine: Option<T369InferenceEngine>,
+/// Priorité : T369Inference → Fallback local intelligent
+pub struct ThevieInferenceEngine {
+    engine: Option<T369Inference>,
     fallback_enabled: bool,
     model_path: String,
+    total_requests: u64,
 }
 
-impl HybridInferenceEngine {
-    pub fn new(model_path: &str, _lora_path: Option<&str>) -> Result<Self, String> {
-        match T369InferenceEngine::new(model_path) {
+impl ThevieInferenceEngine {
+    pub fn new(model_path: &str) -> Result<Self, String> {
+        match T369Inference::new() {
             Ok(engine) => {
-                info!("[Inference] Moteur T369Inference chargé avec succès");
+                info!("[ThevieInference] ✅ Moteur T369Inference initialisé avec succès");
                 Ok(Self {
                     engine: Some(engine),
                     fallback_enabled: true,
                     model_path: model_path.to_string(),
+                    total_requests: 0,
                 })
             }
             Err(e) => {
-                warn!("[Inference] Échec chargement T369Inference: {}", e);
+                warn!("[ThevieInference] ⚠️ Échec chargement T369Inference: {}", e);
                 Ok(Self {
                     engine: None,
                     fallback_enabled: true,
                     model_path: model_path.to_string(),
+                    total_requests: 0,
                 })
             }
         }
     }
 
-    /// Génère une réponse (avec fallback intelligent)
-    pub async fn generate(
-        &mut self,
-        prompt: &str,
-        max_tokens: u32,
-        _lora_adapter: Option<String>,
-    ) -> Result<String, String> {
-        
-        // TODO implémenté : Support LoRA futur (désactivé pour l'instant)
-        // if let Some(lora_name) = lora_adapter {
-        //     self.apply_lora(&lora_name);
-        // }
+    /// Génère une réponse (priorité T369Inference + fallback intelligent)
+    pub async fn generate(&mut self, prompt: &str, max_tokens: usize) -> Result<String, String> {
+        self.total_requests += 1;
+        debug!("[ThevieInference] Requête #{} reçue", self.total_requests);
 
-        // === Utilisation du moteur T369Inference ===
+        // === Moteur principal : T369Inference ===
         if let Some(engine) = &mut self.engine {
-            match engine.generate(prompt, max_tokens as usize) {
+            match engine.generate(prompt, max_tokens) {
                 Ok(response) => {
-                    info!("[Inference] Réponse générée via T369Inference");
+                    info!("[ThevieInference] Réponse générée via T369Inference");
                     return Ok(response);
                 }
                 Err(e) => {
-                    warn!("[Inference] Erreur T369Inference: {}", e);
+                    warn!("[ThevieInference] Erreur T369Inference: {}", e);
                 }
             }
         }
 
-        // === Fallback (si le moteur principal échoue) ===
+        // === Fallback intelligent ===
         if self.fallback_enabled {
-            warn!("[Inference] Utilisation du fallback local");
-            return Ok(self.local_fallback(prompt));
+            let fallback = self.generate_smart_fallback(prompt);
+            warn!("[ThevieInference] Utilisation du fallback local");
+            return Ok(fallback);
         }
 
         Err("Aucun moteur d'inférence disponible".to_string())
     }
 
-    /// Réponse de fallback intelligente
-    fn local_fallback(&self, prompt: &str) -> String {
-        if prompt.to_lowercase().contains("comment") || 
-           prompt.to_lowercase().contains("utiliser") || 
-           prompt.to_lowercase().contains("ouvrir") {
-            return "Je suis Thevie. Pour l'instant, je réponds en mode fallback. \
-                   Le moteur T369Inference est en cours de chargement.".to_string();
+    /// Fallback intelligent et contextuel
+    fn generate_smart_fallback(&self, prompt: &str) -> String {
+        let lower = prompt.to_lowercase();
+
+        if lower.contains("comment") || lower.contains("utiliser") || lower.contains("ouvrir") {
+            return "Je suis Thevie. Le moteur principal est temporairement indisponible. \
+                   Que puis-je faire pour toi en attendant ?".to_string();
+        }
+
+        if lower.contains("erreur") || lower.contains("problème") {
+            return "Je rencontre actuellement une petite difficulté technique. \
+                   Peux-tu reformuler ta question ?".to_string();
+        }
+
+        if prompt.len() > 200 {
+            return "Ta question est assez complexe. Le moteur d'inférence principal est en cours de chargement. \
+                   En attendant, peux-tu me donner plus de détails ?".to_string();
         }
 
         format!(
-            "[Thevie Fallback] Réponse générée localement pour : {}",
-            prompt.chars().take(80).collect::<String>()
+            "[Thevie] Réponse locale : {}",
+            prompt.chars().take(120).collect::<String>()
         )
     }
 
-    /// Retourne l'état du moteur
+    /// Retourne l'état complet du moteur
     pub fn get_status(&self) -> String {
-        if self.engine.is_some() {
-            format!("T369Inference actif | Modèle: {}", self.model_path)
-        } else {
-            "T369Inference non chargé (fallback actif)".to_string()
+        match &self.engine {
+            Some(_) => format!(
+                "T369Inference actif | Requêtes traitées: {} | Modèle: {}",
+                self.total_requests, self.model_path
+            ),
+            None => "T369Inference non chargé (fallback actif)".to_string(),
         }
     }
 
-    /// Recharge le moteur (méthode implémentée)
+    /// Vérifie si le moteur principal est prêt
+    pub fn is_ready(&self) -> bool {
+        self.engine.is_some()
+    }
+
+    /// Recharge le moteur
     pub fn reload(&mut self) -> Result<(), String> {
-        match T369InferenceEngine::new(&self.model_path) {
+        match T369Inference::new() {
             Ok(engine) => {
                 self.engine = Some(engine);
-                info!("[Inference] Moteur T369Inference rechargé avec succès");
+                info!("[ThevieInference] Moteur T369Inference rechargé avec succès");
                 Ok(())
             }
             Err(e) => {
-                warn!("[Inference] Échec rechargement: {}", e);
+                warn!("[ThevieInference] Échec rechargement: {}", e);
                 Err(e)
             }
         }
     }
 
-    /// Active ou désactive le mode fallback
+    /// Active/désactive le mode fallback
     pub fn set_fallback(&mut self, enabled: bool) {
         self.fallback_enabled = enabled;
-        info!("[Inference] Fallback {}", if enabled { "activé" } else { "désactivé" });
+        info!(
+            "[ThevieInference] Mode fallback {}",
+            if enabled { "activé" } else { "désactivé" }
+        );
     }
 
-    /// Retourne le chemin du modèle actuel
-    pub fn get_model_path(&self) -> &str {
-        &self.model_path
+    /// Retourne le nombre de requêtes traitées
+    pub fn get_request_count(&self) -> u64 {
+        self.total_requests
     }
 }

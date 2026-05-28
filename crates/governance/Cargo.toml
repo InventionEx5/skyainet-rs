@@ -1,0 +1,39 @@
+[package]
+name = "skyainet-governance"
+version = "0.4.2"
+edition = "2021"
+authors = ["SkyAInet Team"]
+description = "SkyAInet Governance — DAO, Conviction Voting, PoSI & Decentralized Decision System"
+license = "AGPL-3.0"
+repository = "https://github.com/InventionEx5/skyainet-rs"
+
+[dependencies]
+# Async & Runtime
+tokio = { version = "1.38", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time & Date
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.8", features = ["v4"] }
+
+# Internal dependencies (workspace)
+skyainet-core = { path = "../core" }
+skyainet-node = { path = "../node" }
+skyainet-rewards = { path = "../rewards" }   # Si tu as un crate rewards séparé
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = []
+full-governance = []      # Active Conviction Voting + PoSI + toutes les fonctionnalités avancées
+light-dao = []            # Mode léger (seulement DAO basique sans conviction)
+posi-only = []            # Active uniquement le système PoSI

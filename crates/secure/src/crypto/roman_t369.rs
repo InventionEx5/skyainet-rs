@@ -1,24 +1,16 @@
-// crates/secure/src/crypto/gematria/roman_t369.rs
+// crates/secure-transport/src/crypto/gematria/roman_t369.rs
 // =====================================================
-// RomanT369 v4.0 — Chiffrement Hyper Sécurisé & Ultra Rapide
-// SkyAInet × Nikola T369 — Roman Weighted Diffusion + Hyper256
-// Version Production Ready
+// Roman T369 v3.2 — Chiffrement Hyper Sécurisé & Ultra Rapide
+// Innovation : Roman Weighted Diffusion + Hyper256 + Logique Additive/Soustractive
 // =====================================================
 
 use sha2::{Sha256, Digest};
-use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GematriaMode {
-    Dynamic,   // 95 caractères
-    Extended,  // 128 caractères
-    Hyper256,  // 256 caractères (recommandé)
-}
-
-#[derive(Error, Debug)]
-pub enum RomanError {
-    #[error("Decryption failed")]
-    DecryptionFailed,
+    Dynamic,
+    Extended,
+    Hyper256,
 }
 
 #[derive(Clone)]
@@ -29,6 +21,7 @@ pub struct RomanT369 {
     permutation: [u8; 256],
     mode: GematriaMode,
     hyper_lookup: Option<[u8; 256]>,
+    roman_weights: [u8; 7],
 }
 
 impl RomanT369 {
@@ -46,6 +39,8 @@ impl RomanT369 {
             None
         };
 
+        let roman_weights = [1, 5, 10, 50, 100, 200, 250];
+
         Self {
             key,
             nonce,
@@ -53,6 +48,7 @@ impl RomanT369 {
             permutation,
             mode,
             hyper_lookup,
+            roman_weights,
         }
     }
 
@@ -71,35 +67,41 @@ impl RomanT369 {
 
     fn precompute_hyper_lookup(permutation: &[u8; 256]) -> [u8; 256] {
         let mut lookup = [0u8; 256];
-        lookup.copy_from_slice(permutation);
+        for i in 0..256 {
+            lookup[i] = permutation[i];
+        }
         lookup
     }
 
     // =====================================================
-    // Roman Weighted Diffusion (Cœur de l’innovation)
+    // INNOVATION : Roman Weighted Diffusion (Hyper Puissant)
     // =====================================================
-
-    const ROMAN_WEIGHTS: [u8; 7] = [1, 5, 10, 50, 100, 200, 250];
 
     #[inline(always)]
     fn roman_diffuse(&self, byte: u8, position: usize) -> u8 {
-        let weight = Self::ROMAN_WEIGHTS[(byte as usize + position) % 7];
+        let roman_idx = (byte as usize + position) % 7;
+        let weight = self.roman_weights[roman_idx];
 
-        match (byte + position as u8) % 3 {
-            0 => byte.wrapping_sub(weight).rotate_right(2),
-            1 => byte.wrapping_add(weight).rotate_left(3),
-            _ => (byte ^ weight).rotate_left(1),
+        if (byte + position as u8) % 3 == 0 {
+            byte.wrapping_sub(weight).rotate_right(2)
+        } else if (byte + position as u8) % 3 == 1 {
+            byte.wrapping_add(weight).rotate_left(3)
+        } else {
+            (byte ^ weight).rotate_left(1)
         }
     }
 
     #[inline(always)]
     fn roman_undiffuse(&self, byte: u8, position: usize) -> u8 {
-        let weight = Self::ROMAN_WEIGHTS[(byte as usize + position) % 7];
+        let roman_idx = (byte as usize + position) % 7;
+        let weight = self.roman_weights[roman_idx];
 
-        match (byte + position as u8) % 3 {
-            0 => byte.wrapping_add(weight).rotate_left(2),
-            1 => byte.wrapping_sub(weight).rotate_right(3),
-            _ => (byte ^ weight).rotate_right(1),
+        if (byte + position as u8) % 3 == 0 {
+            byte.wrapping_add(weight).rotate_left(2)
+        } else if (byte + position as u8) % 3 == 1 {
+            byte.wrapping_sub(weight).rotate_right(3)
+        } else {
+            (byte ^ weight).rotate_right(1)
         }
     }
 
@@ -128,7 +130,7 @@ impl RomanT369 {
         ciphertext
     }
 
-    pub fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>, RomanError> {
+    pub fn decrypt(&self, ciphertext: &[u8]) -> Option<Vec<u8>> {
         let mut plaintext = Vec::with_capacity(ciphertext.len());
 
         if let Some(lookup) = &self.hyper_lookup {
@@ -146,6 +148,38 @@ impl RomanT369 {
             }
         }
 
-        Ok(plaintext)
+        Some(plaintext)
     }
+
+    // =====================================================
+    // ALPHABET 256 (avec les 7 chiffres romains)
+    // =====================================================
+
+    pub const ROMAN_T369_ALPHABET: [char; 256] = [
+        // 52 Lettres latines
+        'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+        'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
+
+        // 10 Chiffres
+        '0','1','2','3','4','5','6','7','8','9',
+
+        // 33 Cyrilliques + 24 Grecques
+        'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р','С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я',
+        'Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω',
+
+        // =====================================================
+        // 7 CHIFFRES ROMAINS (Cœur du système)
+        // =====================================================
+        'I','V','X','L','C','D','M',
+
+        // 2 symboles + 128 caractères internationaux
+        '⁂','⁑',
+        'ا','ب','ت','ث','ج','ح','خ','د','ذ','ر','ز','س','ش','ص','ض','ط','ظ','ع','غ','ف','ق','ك','ل','م','ن','ه','و','ي',
+        'א','ב','ג','ד','ה','ו','ז','ח','ט','י','כ','ל','מ','נ','ס','ע','פ','צ','ק','ר','ש','ת',
+        'ა','ბ','გ','د','ე','ვ','ზ','თ','ი','კ','ლ','მ','ნ','ო','პ','ჟ','რ','ს','ტ','უ','ფ','ქ','ღ','ყ','შ','ჩ','ც','ძ','წ','ჭ','ხ','ჯ','ჰ',
+        'Ա','Բ','Գ','Դ','Ե','Զ','Է','Ը','Թ','Ժ','Ի','Լ','Խ','Ծ','Կ','Հ','Ձ','Ղ','Ճ','Մ','Յ','Ն','Շ','Ո','Չ','Պ','Ջ','Ռ','Ս','Վ','Տ','Ր','Ց',
+        'अ','आ','इ','ई','उ','ऊ','ऋ','ए','ऐ','ओ','औ','क','ख','ग','घ','च','छ','ज','झ','ट',
+        'ก','ข','ค','ฆ','ง','จ','ฉ','ช','ซ','ฌ',
+        '∞','∑','∏','√','∫','∂','∇','∆','≈','≠','≤','≥',
+    ];
 }

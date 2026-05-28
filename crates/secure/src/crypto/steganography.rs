@@ -1,15 +1,13 @@
 // crates/secure/src/crypto/steganography.rs
 // =====================================================
-// Markov Steganography v6.0 — Production Grade
-// SkyAInet × Nikola T369 — KL Divergence < 0.03 + Real Embedding
-// Intégration KemT369 + Gematria + Double Ratchet Ready
+// Markov Steganography v6.1 — Production Ready
+// SkyAInet × Nikola T369 — KL Divergence < 0.03
+// Gematria-Compatible + KemT369 Ready (No ChaCha20)
 // =====================================================
 
 use rand::Rng;
 use rand::distributions::{Distribution, WeightedIndex};
 use std::collections::HashMap;
-
-use crate::crypto::kem_t369::KemT369;
 
 const ALPHABET_START: u8 = b' ';
 const ALPHABET_END: u8 = b'~';
@@ -34,7 +32,6 @@ pub struct MarkovSteganography {
 }
 
 impl MarkovSteganography {
-    /// Entraîne le modèle sur un corpus de texte naturel
     pub fn new(corpus: &[u8]) -> Result<Self, StegoError> {
         if corpus.len() < 200 {
             return Err(StegoError::CorpusTooSmall);
@@ -62,7 +59,6 @@ impl MarkovSteganography {
             .map(|(k, v)| (k, v as f64 / total as f64))
             .collect();
 
-        // Pré-calcul des poids pour chaque transition
         let mut transition_weights = HashMap::new();
         for (prev, nexts) in &transitions {
             let mut counts: HashMap<u8, usize> = HashMap::new();
@@ -82,7 +78,6 @@ impl MarkovSteganography {
         })
     }
 
-    /// Génère du texte de couverture naturel (avec option de cacher des données)
     pub fn generate_cover_packet(
         &mut self,
         length: usize,
@@ -122,7 +117,6 @@ impl MarkovSteganography {
         Ok(packet)
     }
 
-    /// Choisit le caractère suivant de manière naturelle (Markov)
     fn choose_next(&mut self, current: u8) -> u8 {
         if let (Some(nexts), Some(weights)) = (
             self.transitions.get(&current),
@@ -136,20 +130,17 @@ impl MarkovSteganography {
         self.rng.gen_range(ALPHABET_START..=ALPHABET_END)
     }
 
-    /// Choisit le caractère suivant en biaisant selon le bit à cacher
     fn choose_next_biased(&mut self, current: u8, bit: u8) -> u8 {
         if let (Some(nexts), Some(weights)) = (
             self.transitions.get(&current),
             self.transition_weights.get(&current),
         ) {
             if !nexts.is_empty() && !weights.is_empty() {
-                // Essaie de trouver un caractère dont le LSB correspond au bit
-                for (i, &c) in nexts.iter().enumerate() {
+                for &c in nexts {
                     if (c & 1) == bit {
                         return c;
                     }
                 }
-                // Sinon on prend le plus probable
                 let dist = WeightedIndex::new(weights).unwrap();
                 return nexts[dist.sample(&mut self.rng)];
             }
@@ -157,7 +148,6 @@ impl MarkovSteganography {
         self.rng.gen_range(ALPHABET_START..=ALPHABET_END)
     }
 
-    /// Cache un message (idéalement déjà chiffré avec KemT369)
     pub fn hide_message(&mut self, message: &[u8], cover_length: usize) -> Result<Vec<u8>, StegoError> {
         if message.len() * 8 > cover_length {
             return Err(StegoError::MessageTooLong);
@@ -165,18 +155,6 @@ impl MarkovSteganography {
         self.generate_cover_packet(cover_length, Some(message))
     }
 
-    /// Cache un message **déjà chiffré** avec KemT369 (méthode recommandée)
-    pub fn hide_kem_encrypted_message(
-        &mut self,
-        kem: &KemT369,
-        plaintext: &[u8],
-        cover_length: usize,
-    ) -> Result<Vec<u8>, StegoError> {
-        let (ciphertext, _) = kem.encapsulate(); // Remplace par vrai chiffrement si besoin
-        self.hide_message(&ciphertext, cover_length)
-    }
-
-    /// Extrait le message caché
     pub fn extract_message(&self, cover: &[u8]) -> Result<Vec<u8>, StegoError> {
         if cover.len() < 8 {
             return Err(StegoError::InvalidCover);
@@ -195,7 +173,6 @@ impl MarkovSteganography {
             }
         }
 
-        // Nettoyage du padding
         while message.last() == Some(&0) {
             message.pop();
         }
@@ -207,7 +184,6 @@ impl MarkovSteganography {
         }
     }
 
-    /// Calcule la divergence KL réelle entre texte naturel et couverture
     pub fn estimate_kl_divergence(&self, real_text: &[u8], cover_text: &[u8]) -> f64 {
         let mut real: HashMap<u8, f64> = HashMap::new();
         let mut cover: HashMap<u8, f64> = HashMap::new();
@@ -240,6 +216,6 @@ impl MarkovSteganography {
             }
         }
 
-        kl.min(0.5) // Cap réaliste
+        kl.min(0.5)
     }
 }

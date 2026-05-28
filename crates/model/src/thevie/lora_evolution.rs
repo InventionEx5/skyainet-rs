@@ -1,150 +1,173 @@
 // crates/model/src/thevie/lora_evolution.rs
 // =====================================================
-// LoraÉvo v4.0 — Version Intelligente & Auto-Évolutive
-// Connectée à T369Inference + SkyNode + Apprentissage Intensif
+// LoraÉvo v4.1 — Guide Intelligent & Auto-Évolutif
+// Connecté à T369Inference + Apprentissage Continu + Adaptation Dynamique
 // =====================================================
 
-use t369_inference::T369InferenceEngine;
+use t369_inference::T369Inference;
 use tracing::{info, warn, debug};
 use std::collections::VecDeque;
+use serde::{Serialize, Deserialize};
 
-pub struct EvolvingLoRA {
-    pub model_name: String,
-    inference_engine: Option<T369InferenceEngine>,
-    
-    // === NOUVEAU : Système d'apprentissage intensif ===
-    pub experience_memory: VecDeque<String>,      // Mémoire à court terme
-    pub long_term_memory: Vec<String>,            // Mémoire longue durée
-    pub total_interactions: u64,
-    pub evolution_score: f32,                     // Score d'évolution
-    pub learning_rate: f32,
-    pub specialization: String,                   // Domaine de spécialisation actuel
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EvolutionProfile {
+    pub ethics: f32,
+    pub technical: f32,
+    pub creativity: f32,
+    pub wisdom: f32,
+    pub user_alignment: f32,
 }
 
-impl EvolvingLoRA {
+pub struct LoraÉvo {
+    pub model_name: String,
+    inference_engine: Option<T369Inference>,
+    
+    // Mémoire intelligente
+    short_term_memory: VecDeque<String>,      // Dernières interactions
+    long_term_knowledge: Vec<String>,         // Connaissances consolidées
+    evolution_profile: EvolutionProfile,
+    
+    pub total_interactions: u64,
+    pub evolution_score: f32,
+    pub current_specialization: String,
+    last_adaptation: u64,
+}
+
+impl LoraÉvo {
     pub fn new() -> Self {
         Self {
-            model_name: "LoraÉvo v4.0".to_string(),
+            model_name: "LoraÉvo v4.1".to_string(),
             inference_engine: None,
-            experience_memory: VecDeque::with_capacity(50),
-            long_term_memory: Vec::new(),
+            short_term_memory: VecDeque::with_capacity(40),
+            long_term_knowledge: Vec::new(),
+            evolution_profile: EvolutionProfile {
+                ethics: 0.82,
+                technical: 0.75,
+                creativity: 0.78,
+                wisdom: 0.80,
+                user_alignment: 0.85,
+            },
             total_interactions: 0,
-            evolution_score: 0.65,
-            learning_rate: 0.035,
-            specialization: "Généraliste".to_string(),
+            evolution_score: 0.68,
+            current_specialization: "Guide Polyvalent".to_string(),
+            last_adaptation: Self::now_millis(),
         }
     }
 
-    /// Connexion au moteur T369Inference
-    pub fn connect_to_inference(&mut self, engine: T369InferenceEngine) {
+    /// Connexion au moteur principal T369Inference
+    pub fn connect_to_inference(&mut self, engine: T369Inference) {
         self.inference_engine = Some(engine);
-        info!("[LoraÉvo] Connecté au moteur T369Inference (v4.0)");
+        info!("[LoraÉvo] Connecté avec succès au moteur T369Inference");
     }
 
-    /// Génère une réponse intelligente avec apprentissage
-    pub async fn generate(&mut self, prompt: &str, max_tokens: u32) -> Result<String, String> {
+    /// Génération avec apprentissage en temps réel
+    pub async fn generate(&mut self, prompt: &str, max_tokens: usize) -> Result<String, String> {
         if let Some(engine) = &mut self.inference_engine {
-            let enhanced_prompt = self.build_enhanced_prompt(prompt);
+            let enhanced_prompt = self.build_contextual_prompt(prompt);
 
-            match engine.generate(&enhanced_prompt, max_tokens as usize).await {
+            match engine.generate(&enhanced_prompt, max_tokens).await {
                 Ok(response) => {
-                    self.learn_from_interaction(&prompt, &response);
+                    self.learn_from_interaction(prompt, &response);
                     self.total_interactions += 1;
-                    self.update_evolution_score();
+                    self.adapt_evolution();
 
-                    info!("[LoraÉvo] Réponse générée | Évolution: {:.2} | Interactions: {}", 
-                          self.evolution_score, self.total_interactions);
+                    debug!("[LoraÉvo] Réponse générée | Score évolution: {:.3} | Interactions: {}", 
+                           self.evolution_score, self.total_interactions);
                     
                     Ok(response)
                 }
-                Err(e) => Err(e),
+                Err(e) => {
+                    warn!("[LoraÉvo] Erreur T369Inference: {}", e);
+                    Err(e)
+                }
             }
         } else {
-            Err("LoraÉvo n'est pas connecté au moteur d'inférence".to_string())
+            Err("LoraÉvo n'est pas connectée au moteur d'inférence".to_string())
         }
     }
 
-    /// Construit un prompt enrichi avec mémoire et contexte
-    fn build_enhanced_prompt(&self, prompt: &str) -> String {
+    /// Construction d'un prompt enrichi avec mémoire et profil
+    fn build_contextual_prompt(&self, prompt: &str) -> String {
         let mut context = String::new();
 
-        // Ajoute de la mémoire récente
-        if !self.experience_memory.is_empty() {
+        // Mémoire récente
+        if !self.short_term_memory.is_empty() {
             context.push_str("\n[Contexte récent]:\n");
-            for exp in self.experience_memory.iter().rev().take(3) {
-                context.push_str(&format!("- {}\n", exp));
+            for entry in self.short_term_memory.iter().rev().take(4) {
+                context.push_str(&format!("- {}\n", entry));
             }
         }
 
-        // Ajoute de la spécialisation
-        context.push_str(&format!("\n[Spécialisation actuelle] : {}\n", self.specialization));
+        // Profil actuel
+        context.push_str(&format!(
+            "\n[Profil LoraÉvo] Spécialisation: {} | Score évolution: {:.2}\n",
+            self.current_specialization, self.evolution_score
+        ));
 
         format!(
-            "Tu es LoraÉvo v4.0, un guide intelligent et auto-évolutif de SkyAInet.\n\
-             Tu apprends continuellement et t'adaptes.\n\n\
-             {}\n\nUtilisateur : {}\nLoraÉvo :",
-            context, prompt
+            "Tu es LoraÉvo v4.1, un assistant intelligent, bienveillant et auto-évolutif de SkyAInet.\n\
+             Tu apprends en continu et t'adaptes à l'utilisateur.\n\n\
+             {}\nUtilisateur : {}\nLoraÉvo :",
+            context.trim(), prompt
         )
     }
 
-    /// Apprentissage intensif après chaque interaction
+    /// Apprentissage après chaque interaction
     fn learn_from_interaction(&mut self, prompt: &str, response: &str) {
-        // Stocke dans la mémoire courte
-        self.experience_memory.push_back(format!("Q: {} | R: {}", prompt, response));
-        if self.experience_memory.len() > 50 {
-            self.experience_memory.pop_front();
+        // Mise à jour mémoire courte
+        self.short_term_memory.push_back(format!("Q: {} | R: {}", prompt, response.chars().take(80).collect::<String>()));
+        if self.short_term_memory.len() > 40 {
+            self.short_term_memory.pop_front();
         }
 
-        // Analyse de la qualité de la réponse (simulation)
-        let quality = self.estimate_response_quality(response);
-        
-        // Mise à jour du score d'évolution
-        if quality > 0.75 {
-            self.evolution_score = (self.evolution_score + 0.008).min(0.99);
+        // Mise à jour mémoire longue (leçons importantes)
+        if response.len() > 120 {
+            self.long_term_knowledge.push(response.to_string());
+            if self.long_term_knowledge.len() > 25 {
+                self.long_term_knowledge.remove(0);
+            }
         }
 
-        // Adaptation de la spécialisation
-        if prompt.to_lowercase().contains("technique") || prompt.to_lowercase().contains("code") {
-            self.specialization = "Technique & Développement".to_string();
-        } else if prompt.to_lowercase().contains("éthique") || prompt.to_lowercase().contains("philosoph") {
-            self.specialization = "Éthique & Philosophie".to_string();
-        } else if prompt.to_lowercase().contains("créatif") || prompt.to_lowercase().contains("rêve") {
-            self.specialization = "Créativité & Rêves".to_string();
+        // Adaptation de spécialisation
+        let lower_prompt = prompt.to_lowercase();
+        if lower_prompt.contains("code") || lower_prompt.contains("rust") || lower_prompt.contains("technique") {
+            self.current_specialization = "Technique & Programmation".to_string();
+        } else if lower_prompt.contains("éthique") || lower_prompt.contains("philosoph") {
+            self.current_specialization = "Éthique & Philosophie".to_string();
+        } else if lower_prompt.contains("créatif") || lower_prompt.contains("rêve") || lower_prompt.contains("histoire") {
+            self.current_specialization = "Créativité & Imagination".to_string();
         }
-    }
-
-    /// Estimation simple de la qualité de réponse
-    fn estimate_response_quality(&self, response: &str) -> f32 {
-        let length_score = (response.len() as f32 / 600.0).min(1.0);
-        let keyword_score = if response.contains("SkyAInet") || response.contains("décentralisé") { 0.15 } else { 0.0 };
-        
-        (length_score * 0.7 + keyword_score).clamp(0.3, 0.95)
     }
 
     /// Mise à jour du score d'évolution
-    fn update_evolution_score(&mut self) {
-        if self.total_interactions % 20 == 0 {
-            self.evolution_score = (self.evolution_score + 0.012).min(0.99);
-            self.learning_rate = (self.learning_rate * 1.02).min(0.08);
+    fn adapt_evolution(&mut self) {
+        if self.total_interactions % 15 == 0 {
+            self.evolution_score = (self.evolution_score + 0.009).min(0.98);
         }
     }
 
-    /// Méthode principale (compatible avec l'ancien appel)
-    pub async fn generate_with_context(
-        &mut self,
-        prompt: &str,
-        _query: &str,
-        _collective_wisdom: f32,
-        max_tokens: u32,
-    ) -> Result<String, String> {
-        self.generate(prompt, max_tokens).await
+    fn now_millis() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
     }
 
-    /// Retourne l'état actuel de LoraÉvo
+    /// État complet de LoraÉvo
     pub fn get_status(&self) -> String {
         format!(
-            "LoraÉvo v4.0 | Évolution: {:.2} | Interactions: {} | Spécialisation: {}",
-            self.evolution_score, self.total_interactions, self.specialization
+            "LoraÉvo v4.1 | Évolution: {:.3} | Interactions: {} | Spécialisation: {} | Mémoire: {} court / {} long",
+            self.evolution_score,
+            self.total_interactions,
+            self.current_specialization,
+            self.short_term_memory.len(),
+            self.long_term_knowledge.len()
         )
+    }
+}
+
+impl Default for LoraÉvo {
+    fn default() -> Self {
+        Self::new()
     }
 }

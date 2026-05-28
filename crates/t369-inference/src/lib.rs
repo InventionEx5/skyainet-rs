@@ -1,3 +1,8 @@
+// crates/t369-inference/src/lib.rs
+// =====================================================
+// T369Inference - Roman Neural Inference Engine
+// =====================================================
+
 pub mod inference;
 pub mod model;
 pub mod roman_attention;
@@ -9,12 +14,6 @@ pub mod quant;
 pub mod roman_diffusion;
 pub mod tokenizer;
 pub mod transformer_block;
-
-pub mod collectivin;
-pub mod inself;
-pub mod inaware;
-pub mod indream;
-pub mod meshin;
 
 pub use inference::T369Inference;
 pub use model::{T369Model, ModelConfig};

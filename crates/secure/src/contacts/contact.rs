@@ -1,24 +1,26 @@
 // crates/secure/src/contacts/contact.rs
 // =====================================================
-// Contact v6.0 — Structure de Contact Intelligente
-// SkyAInet × Nikola T369 — Réputation + Vérification Multi-Niveaux + QR + ZipMemory Ready
-// Version Ultra Améliorée + Compatible avec Messaging & Manager
+// Contact v6.1 — Structure de Contact Intelligente + DID
+// SkyAInet × Nikola T369 — Réputation + Vérification Multi-Niveaux + QR + DID
+// Compatible avec Messaging, Groupes et ContactManager
 // =====================================================
 
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
 use tracing::debug;
 
+use crate::identity::did::Did;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Contact {
     pub node_id: [u8; 32],
-    pub name: String,                    // Nom d'affichage principal
+    pub name: String,
     pub public_key: Vec<u8>,
-    pub signature: Vec<u8>,              // Signature Dilithium de la clé publique
-    pub did: String,
-    pub reputation_score: i32,           // 0 → 100
-    pub verification_level: u8,          // 0=None, 1=Signature, 2=Signature+QR, 3=Full Trust
-    pub qr_code_hash: Option<String>,    // Hash du QR Air-Gap signé
+    pub signature: Vec<u8>,
+    pub did: Option<Did>,                    // ← Identité décentralisée
+    pub reputation_score: i32,
+    pub verification_level: u8,
+    pub qr_code_hash: Option<String>,
     pub interaction_count: u32,
     pub last_interaction: Option<DateTime<Utc>>,
     pub notes: Option<String>,
@@ -33,7 +35,6 @@ impl Contact {
         node_id: [u8; 32],
         name: String,
         public_key: Vec<u8>,
-        did: String,
     ) -> Self {
         let now = Utc::now();
 
@@ -42,7 +43,7 @@ impl Contact {
             name,
             public_key,
             signature: Vec::new(),
-            did,
+            did: None,
             reputation_score: 50,
             verification_level: 0,
             qr_code_hash: None,
@@ -55,7 +56,26 @@ impl Contact {
         }
     }
 
-    /// Met à jour la réputation (avec clamp)
+    /// Associe un DID à ce contact (décentralisation de l'identité)
+    pub fn set_did(&mut self, did: Did) {
+        self.did = Some(did);
+        if self.verification_level < 2 {
+            self.verification_level = 2;
+        }
+        debug!("[Contact] DID associé à {}", self.name);
+    }
+
+    /// Retourne le DID sous forme de chaîne courte
+    pub fn get_did_string(&self) -> Option<String> {
+        self.did.as_ref().map(|d| d.to_short_string())
+    }
+
+    /// Vérifie si le contact a une identité décentralisée forte
+    pub fn has_decentralized_identity(&self) -> bool {
+        self.did.is_some() && self.verification_level >= 2
+    }
+
+    /// Met à jour la réputation
     pub fn update_reputation(&mut self, delta: i32) {
         self.reputation_score = (self.reputation_score + delta).clamp(0, 100);
         debug!(
@@ -155,7 +175,6 @@ impl Default for Contact {
             [0u8; 32],
             "Unknown Contact".to_string(),
             vec![],
-            "did:t369:unknown".to_string(),
         )
     }
 }

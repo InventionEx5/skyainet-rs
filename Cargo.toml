@@ -10,18 +10,18 @@ members = [
     "crates/financial",
     "crates/api",
     "crates/t369-inference",
-    "crates/secure-transport",
+    "crates/secure",           # ← Renommé de secure-transport → secure
 ]
 
 [workspace.package]
-version = "0.6.8"
+version = "0.6.1"
 edition = "2021"
 authors = ["SkyAInet Team"]
 license = "AGPL-3.0"
 repository = "https://github.com/InventionEx5/skyainet-rs"
 
 [workspace.dependencies]
-# Shared dependencies
+# === Shared dependencies ===
 tokio = { version = "1.37", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -31,14 +31,14 @@ thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.8", features = ["v4"] }
 
-# Internal crates
-skyainet-core = { path = "crates/core" }
-skyainet-node = { path = "crates/node" }
-skyainet-model = { path = "crates/model" }
-skyainet-memory = { path = "crates/memory" }
-skyainet-sentinel = { path = "crates/sentinel" }
-skyainet-governance = { path = "crates/governance" }
-skyainet-financial = { path = "crates/financial" }
-skyainet-api = { path = "crates/api" }
-t369-inference = { path = "crates/t369-inference" }
-skyainet-secure-transport = { path = "crates/secure-transport" }
+# === Internal crates (références) ===
+skyainet-core          = { path = "crates/core" }
+skyainet-node          = { path = "crates/node" }
+skyainet-model         = { path = "crates/model" }
+skyainet-memory        = { path = "crates/memory" }
+skyainet-sentinel      = { path = "crates/sentinel" }
+skyainet-governance    = { path = "crates/governance" }
+skyainet-financial     = { path = "crates/financial" }
+skyainet-api           = { path = "crates/api" }
+t369-inference         = { path = "crates/t369-inference" }
+skyainet-secure        = { path = "crates/secure" }     # ← Nouveau nom

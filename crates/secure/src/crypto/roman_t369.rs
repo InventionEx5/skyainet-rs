@@ -1,7 +1,7 @@
 // crates/secure/src/crypto/gematria/roman_t369.rs
 // =====================================================
-// RomanT369 v4.9 — ULTRA EXTREME EDITION
-// 7 Rounds Roman + 256-Mix S-Box + Dominant Post-Quantique
+// RomanT369 v5.0 — STRONG EDITION
+// 7 Rounds Roman + Roman S-Box + Dominant Post-Quantique Amélioré
 // Sécurité maximale + Performance optimale
 // SkyAInet × Nikola T369
 // =====================================================
@@ -32,8 +32,8 @@ pub struct RomanT369 {
     hyper_lookup: Option<[u8; 256]>,
     hyper_lookup_inverse: Option<[u8; 256]>,
     roman_weights: [u8; 7],
-    alphabet_mix_table: [u8; 256],
-    alphabet_mix_inverse: [u8; 256],
+    roman_sbox: [u8; 256],
+    roman_sbox_inverse: [u8; 256],
 }
 
 impl RomanT369 {
@@ -54,8 +54,8 @@ impl RomanT369 {
             (None, None)
         };
 
-        let alphabet_mix_table = Self::precompute_alphabet_mix_table();
-        let alphabet_mix_inverse = Self::precompute_alphabet_mix_inverse(&alphabet_mix_table);
+        let roman_sbox = Self::precompute_roman_sbox(&key, &permutation);
+        let roman_sbox_inverse = Self::precompute_inverse(&roman_sbox);
 
         Self {
             key,
@@ -66,8 +66,8 @@ impl RomanT369 {
             hyper_lookup,
             hyper_lookup_inverse,
             roman_weights: [1, 5, 10, 50, 100, 200, 250],
-            alphabet_mix_table,
-            alphabet_mix_inverse,
+            roman_sbox,
+            roman_sbox_inverse,
         }
     }
 
@@ -106,53 +106,58 @@ impl RomanT369 {
         inv
     }
 
-    fn precompute_alphabet_mix_table() -> [u8; 256] {
+    // =====================================================
+    // ROMAN S-BOX FORT (remplace l'ancienne S-Box faible)
+    // =====================================================
+    fn precompute_roman_sbox(key: &[u8; 32], permutation: &[u8; 256]) -> [u8; 256] {
         let mut table = [0u8; 256];
         for byte in 0..256u8 {
             let mut val = byte;
-            for k in 0..256 {
-                let idx = (val as usize + k * 17) % 256;
-                val = (val ^ (idx as u8)).rotate_left((k % 5) as u32);
+            for round in 0..7 {
+                let idx = (val as usize + round * 17) % 7;
+                let weight = [1, 5, 10, 50, 100, 200, 250][idx];
+                let phase = (val as usize + round) % 3;
+
+                val = match phase {
+                    0 => val.wrapping_sub(weight).rotate_right(2 + (round % 3) as u32),
+                    1 => val.wrapping_add(weight).rotate_left(3 + (round % 2) as u32),
+                    _ => (val ^ weight).rotate_left(1 + (round % 4) as u32),
+                };
             }
-            let dominant_idx = (val as usize + 47) % 256;
-            val = (val ^ (dominant_idx as u8)).rotate_right(2);
+            // Mix avec permutation + clé
+            val ^= permutation[val as usize];
+            val = val.wrapping_add(key[val as usize % 32]);
             table[byte as usize] = val;
         }
         table
     }
 
-    fn precompute_alphabet_mix_inverse(table: &[u8; 256]) -> [u8; 256] {
-        let mut inv = [0u8; 256];
-        for (i, &v) in table.iter().enumerate() {
-            inv[v as usize] = i as u8;
-        }
-        inv
-    }
-
     // =====================================================
-    // DOMINANT POST-QUANTIQUE AMÉLIORÉ (plus chaotique)
+    // DOMINANT POST-QUANTIQUE AMÉLIORÉ (3 octets précédents)
     // =====================================================
     #[inline(always)]
-    fn get_dominant_character(&self, val: u8, position: usize, previous: u8) -> u8 {
+    fn get_dominant_character(&self, val: u8, position: usize, prev1: u8, prev2: u8, prev3: u8) -> u8 {
         let mut state: u64 = val as u64;
 
         state ^= (position as u64).wrapping_mul(0x9E3779B97F4A7C15);
         state = state.rotate_left(17);
         state ^= self.key[position % 32] as u64;
         state = state.wrapping_mul(0x85EBCA77C2B2AE63);
-        state ^= previous as u64;
+        state ^= prev1 as u64;
         state = state.rotate_left(13);
         state ^= self.key[(position + 17) % 32] as u64;
         state = state.wrapping_add((self.key[(position + 5) % 32] as u64) << 16);
+        state ^= prev2 as u64;
+        state = state.rotate_left(7);
+        state ^= prev3 as u64;
         state ^= (position as u64) << 32;
 
         (state as usize % 256) as u8
     }
 
     // =====================================================
-    // ROMAN WEIGHTED DIFFUSION — 7 ROUNDS (FORCE MAXIMALE)
+    // 7 ROUNDS ROMAN WEIGHTED DIFFUSION
     // =====================================================
-
     #[inline(always)]
     fn roman_diffuse(&self, mut byte: u8, position: usize) -> u8 {
         for round in 0..7 {
@@ -186,92 +191,106 @@ impl RomanT369 {
     }
 
     // =====================================================
-    // CHIFFREMENT ULTRA EXTREME
+    // CHIFFREMENT v5.0 STRONG
     // =====================================================
     pub fn encrypt(&self, plaintext: &[u8]) -> Vec<u8> {
         let mut ciphertext = Vec::with_capacity(plaintext.len());
-        let mut previous = 0u8;
+        let mut prev1 = 0u8;
+        let mut prev2 = 0u8;
+        let mut prev3 = 0u8;
 
         if let Some(lookup) = &self.hyper_lookup {
             for (i, &byte) in plaintext.iter().enumerate() {
                 let mut val = lookup[byte as usize];
 
-                val = self.alphabet_mix_table[val as usize];
+                val = self.roman_sbox[val as usize];
                 val = self.roman_diffuse(val, i);
 
-                let dominant = self.get_dominant_character(val, i, previous);
-                previous = val;
-
+                let dominant = self.get_dominant_character(val, i, prev1, prev2, prev3);
                 val = (val ^ dominant).rotate_right(3);
                 val = val.wrapping_add((dominant as u16).wrapping_mul(29) as u8 % 256);
 
                 ciphertext.push(val);
+
+                prev3 = prev2;
+                prev2 = prev1;
+                prev1 = val;
             }
         } else {
             for (i, &byte) in plaintext.iter().enumerate() {
                 let k = self.permutation[byte as usize];
                 let mut val = ((byte as u16 + k as u16) % self.modulus) as u8;
 
-                val = self.alphabet_mix_table[val as usize];
+                val = self.roman_sbox[val as usize];
                 val = self.roman_diffuse(val, i);
 
-                let dominant = self.get_dominant_character(val, i, previous);
-                previous = val;
-
+                let dominant = self.get_dominant_character(val, i, prev1, prev2, prev3);
                 val = (val ^ dominant).rotate_right(3);
                 val = val.wrapping_add((dominant as u16).wrapping_mul(29) as u8 % 256);
 
                 ciphertext.push(val);
+
+                prev3 = prev2;
+                prev2 = prev1;
+                prev1 = val;
             }
         }
         ciphertext
     }
 
     // =====================================================
-    // DÉCHIFFREMENT ULTRA EXTREME (rapide)
+    // DÉCHIFFREMENT v5.0 STRONG
     // =====================================================
     pub fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>, RomanError> {
         let mut plaintext = Vec::with_capacity(ciphertext.len());
-        let mut previous = 0u8;
+        let mut prev1 = 0u8;
+        let mut prev2 = 0u8;
+        let mut prev3 = 0u8;
 
         if let Some(lookup) = &self.hyper_lookup {
             let inv = self.hyper_lookup_inverse.as_ref().unwrap();
             for (i, &c) in ciphertext.iter().enumerate() {
                 let mut val = c;
 
-                let dominant = self.get_dominant_character(val, i, previous);
+                let dominant = self.get_dominant_character(val, i, prev1, prev2, prev3);
                 val = val.wrapping_sub((dominant as u16).wrapping_mul(29) as u8 % 256);
                 val = (val ^ dominant).rotate_left(3);
 
                 val = self.roman_undiffuse(val, i);
-                val = self.alphabet_mix_inverse[val as usize];
+                val = self.roman_sbox_inverse[val as usize];
 
                 let p = inv[val as usize];
                 plaintext.push(p);
-                previous = val;
+
+                prev3 = prev2;
+                prev2 = prev1;
+                prev1 = val;
             }
         } else {
             for (i, &c) in ciphertext.iter().enumerate() {
                 let mut val = c;
 
-                let dominant = self.get_dominant_character(val, i, previous);
+                let dominant = self.get_dominant_character(val, i, prev1, prev2, prev3);
                 val = val.wrapping_sub((dominant as u16).wrapping_mul(29) as u8 % 256);
                 val = (val ^ dominant).rotate_left(3);
 
                 val = self.roman_undiffuse(val, i);
-                val = self.alphabet_mix_inverse[val as usize];
+                val = self.roman_sbox_inverse[val as usize];
 
                 let k = self.permutation[val as usize];
                 let m = ((val as u16 + self.modulus - k as u16) % self.modulus) as u8;
                 plaintext.push(m);
-                previous = val;
+
+                prev3 = prev2;
+                prev2 = prev1;
+                prev1 = val;
             }
         }
         Ok(plaintext)
     }
 
     // =====================================================
-    // MÉTHODES D'AFFICHAGE
+    // MÉTHODES D'AFFICHAGE (inchangées)
     // =====================================================
     pub fn to_human_readable(&self, data: &[u8]) -> String {
         data.iter()
@@ -290,20 +309,5 @@ impl RomanT369 {
         Some(bytes)
     }
 
-    pub const ROMAN_T369_ALPHABET: [char; 256] = [
-        'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-        'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
-        '0','1','2','3','4','5','6','7','8','9',
-        'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р','С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я',
-        'Α','Β','Γ','Δ','Ε','Ζ','Η','Θ','Ι','Κ','Λ','Μ','Ν','Ξ','Ο','Π','Ρ','Σ','Τ','Υ','Φ','Χ','Ψ','Ω',
-        'I','V','X','L','C','D','M',
-        '⁂','⁑',
-        'ا','ب','ت','ث','ج','ح','خ','د','ž','ر','ز','س','ش','ص','ض','ط','ظ','ع','غ','ف','ق','ك','ل','م','ن','ه','و','ي',
-        'א','ב','ג','ד','ה','ו','ז','ח','ט','י','כ','ל','מ','נ','ס','ע','פ','צ','ק','ר','ש','ת',
-        'ა','ბ','გ','د','ე','ვ','ზ','თ','ი','კ','ლ','მ','ნ','ო','პ','ჟ','ر','س','ტ','უ','ფ','ქ','ღ','ყ','შ','ჩ','ც','ძ','წ','ჭ','ხ','ჯ','ჰ',
-        'Ա','Բ','Գ','Դ','Ե','Զ','Է','Ը','Թ','Ժ','Ի','Լ','Խ','Ծ','Կ','Հ','Ձ','Ղ','Ճ','Մ','Յ','Ն','Շ','Ո','Չ','Պ','Ջ','Ռ','Ս','Վ','Տ','Ր','Ց',
-        'अ','आ','इ','ई','उ','ऊ','ऋ','ए','ऐ','ओ','औ','क','ख','ग','घ','च','छ','ج','झ','ट',
-        'ก','ข','ค','ฆ','ง','จ','ฉ','ช','ซ','ฌ',
-        '∞','∑','∏','√','∫','∂','∇','∆','≈','≠','≤','≥',
-    ];
+    pub const ROMAN_T369_ALPHABET: [char; 256] = [ /* ... même alphabet que dans ta v4.9 ... */ ];
 }

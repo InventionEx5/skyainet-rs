@@ -1,4 +1,4 @@
-// crates/secure/src/crypto/gematria/roman_t369.rs
+// crates/secure/src/crypto/roman_t369.rs
 // =====================================================
 // RomanT369 v4.6 — Constant 256-Mix Edition (Final)
 // 256 caractères mixés constants (S-Box) + 1 Round + 1 Dominant

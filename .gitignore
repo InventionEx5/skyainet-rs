@@ -1,15 +1,69 @@
+# =====================================================
+# SkyAInet — .gitignore (Version 6.1)
+# =====================================================
+
 # === Rust / Cargo ===
 target/
+**/*.rs.bk
 Cargo.lock
-*.log
 
-# === IDE ===
+# === Build & Artifacts ===
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+*.bin
+*.out
+
+# === Logs & Debug ===
+*.log
+*.trace
+logs/
+debug/
+
+# === IDE & Éditeurs ===
 .idea/
 .vscode/
 *.swp
 *.swo
+*\~
+*.sublime-project
+*.sublime-workspace
 
-# === OS ===
+# === OS spécifiques ===
 .DS_Store
 Thumbs.db
-target/
+ehthumbs.db
+Desktop.ini
+
+# === Environnement & Secrets ===
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+keys/
+config/local.toml
+config/production.toml
+
+# === Tests & Benchmarks ===
+**/__snapshots__/
+**/*.profraw
+**/*.profdata
+
+# === Documentation générée ===
+docs/
+target/doc/
+
+# === Autres ===
+*.bak
+*.tmp
+*.swp
+*.orig
+Session.vim
+.netrwhist
+
+# === Optionnel : si tu veux ignorer les dépendances locales ===
+# crates/*/target/

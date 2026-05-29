@@ -1,7 +1,7 @@
 // crates/secure/src/group/sender_keys.rs
 // =====================================================
-// Sender Keys v5.2 — Group Messaging Sécurisé
-// Compatible avec Contact System + messaging.html
+// Sender Keys v6.3 — Group Messaging Sécurisé
+// Compatible avec Contact v6.2 + DID + messaging.html
 // SkyAInet × Nikola T369
 // =====================================================
 
@@ -11,10 +11,13 @@ use serde::{Serialize, Deserialize};
 use tracing::{info, debug, warn};
 use thiserror::Error;
 
+use hkdf::Hkdf;
+use sha2::Sha256;
+
+use crate::contacts::contact::Contact;
+use crate::contacts::manager::ContactManager;
 use crate::crypto::gematria_aead::GematriaAead;
 use crate::crypto::roman_t369::{RomanT369, GematriaMode};
-use crate::contact::contact::Contact;
-use crate::contact::manager::ContactManager;
 
 #[derive(Error, Debug)]
 pub enum GroupError {
@@ -22,7 +25,7 @@ pub enum GroupError {
     GroupNotFound,
     #[error("Member not found in group")]
     MemberNotFound,
-    #[error("Contact is not verified")]
+    #[error("Contact is not verified or has no DID")]
     ContactNotVerified,
     #[error("Maximum members reached")]
     MaxMembersReached,
@@ -30,6 +33,8 @@ pub enum GroupError {
     EncryptionFailed,
     #[error("Decryption failed")]
     DecryptionFailed,
+    #[error("Sender key not initialized")]
+    SenderKeyNotInitialized,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,7 +43,7 @@ pub struct Group {
     pub name: String,
     pub description: Option<String>,
     pub creator: [u8; 32],
-    pub members: Vec<[u8; 32]>,           // node_id des contacts
+    pub members: Vec<[u8; 32]>,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
     pub epoch: u64,
@@ -63,7 +68,7 @@ impl GroupManager {
         }
     }
 
-    /// Crée un nouveau groupe (compatible avec messaging.html)
+    /// Crée un nouveau groupe
     pub fn create_group(
         &mut self,
         creator_node_id: [u8; 32],
@@ -86,11 +91,11 @@ impl GroupManager {
         self.groups.insert(group_id, group);
         self.sender_keys.insert(group_id, HashMap::new());
 
-        info!("[GroupManager] Groupe créé : {} ({:?})", group_id[0], group_id);
+        info!("[GroupManager] Groupe créé : {}", hex::encode(&group_id[0..4]));
         Ok(group_id)
     }
 
-    /// Ajoute un membre au groupe (doit être un contact vérifié)
+    /// Ajoute un membre (exige DID + vérification niveau 2+)
     pub fn add_member(&mut self, group_id: &[u8; 16], contact: &Contact) -> Result<(), GroupError> {
         let group = self.groups.get_mut(group_id).ok_or(GroupError::GroupNotFound)?;
 
@@ -98,29 +103,30 @@ impl GroupManager {
             return Err(GroupError::MaxMembersReached);
         }
 
-        if !contact.is_trusted() {
+        // Vérification renforcée via ContactManager + DID
+        if !self.contact_manager.can_join_group(&contact.node_id) {
             return Err(GroupError::ContactNotVerified);
         }
 
         if group.members.contains(&contact.node_id) {
-            return Ok(()); // déjà membre
+            return Ok(());
         }
 
         group.members.push(contact.node_id);
         group.last_activity = Utc::now();
 
-        // Initialise une Sender Key pour le nouveau membre
+        // Initialise la Sender Key
         let initial_key: [u8; 32] = rand::random();
         self.sender_keys
             .entry(*group_id)
             .or_default()
             .insert(contact.node_id, initial_key);
 
-        debug!("[GroupManager] Membre ajouté au groupe {:?}", group_id);
+        debug!("[GroupManager] Membre ajouté au groupe {}", hex::encode(&group_id[0..4]));
         Ok(())
     }
 
-    /// Envoie un message chiffré dans le groupe
+    /// Envoie un message chiffré dans le groupe (Sender Key + GematriaAead)
     pub fn send_group_message(
         &mut self,
         group_id: &[u8; 16],
@@ -134,23 +140,25 @@ impl GroupManager {
         }
 
         let chain_key = self.sender_keys
-            .get(group_id)
-            .and_then(|keys| keys.get(sender_node_id))
-            .ok_or(GroupError::MemberNotFound)?;
+            .get_mut(group_id)
+            .and_then(|keys| keys.get_mut(sender_node_id))
+            .ok_or(GroupError::SenderKeyNotInitialized)?;
 
-        // Dérivation de la clé de message
+        // Dérivation de la clé de message (style Sender Keys)
         let mut message_key = [0u8; 32];
-        let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, chain_key);
+        let hk = Hkdf::<Sha256>::new(None, chain_key);
         hk.expand(b"message-key", &mut message_key).expect("HKDF failed");
 
-        // Chiffrement avec GematriaAead
         let aead = GematriaAead::new(message_key, [0u8; 12]);
         let encrypted = aead.encrypt(plaintext);
 
-        // Mise à jour de la chaîne (rotation légère)
-        // TODO: Implémenter vraie rotation Sender Key
+        // Rotation légère de la chaîne (Sender Key rotation)
+        let mut new_chain = [0u8; 32];
+        let hk2 = Hkdf::<Sha256>::new(None, chain_key);
+        hk2.expand(b"next-chain-key", &mut new_chain).expect("HKDF rotation failed");
+        *chain_key = new_chain;
 
-        debug!("[GroupManager] Message envoyé dans le groupe {:?}", group_id);
+        debug!("[GroupManager] Message envoyé dans le groupe {}", hex::encode(&group_id[0..4]));
         Ok(encrypted)
     }
 
@@ -164,10 +172,10 @@ impl GroupManager {
         let chain_key = self.sender_keys
             .get(group_id)
             .and_then(|keys| keys.get(sender_node_id))
-            .ok_or(GroupError::MemberNotFound)?;
+            .ok_or(GroupError::SenderKeyNotInitialized)?;
 
         let mut message_key = [0u8; 32];
-        let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, chain_key);
+        let hk = Hkdf::<Sha256>::new(None, chain_key);
         hk.expand(b"message-key", &mut message_key).expect("HKDF failed");
 
         let aead = GematriaAead::new(message_key, [0u8; 12]);
@@ -176,21 +184,40 @@ impl GroupManager {
         Ok(decrypted)
     }
 
-    /// Récupère les informations d'un groupe
+    /// Rotation explicite des Sender Keys du groupe
+    pub fn rotate_sender_keys(&mut self, group_id: &[u8; 16]) -> Result<(), GroupError> {
+        let group = self.groups.get_mut(group_id).ok_or(GroupError::GroupNotFound)?;
+        let keys = self.sender_keys.get_mut(group_id).ok_or(GroupError::GroupNotFound)?;
+
+        for (node_id, chain_key) in keys.iter_mut() {
+            let mut new_key = [0u8; 32];
+            let hk = Hkdf::<Sha256>::new(Some(b"GROUP-ROTATION"), chain_key);
+            hk.expand(b"next-epoch-key", &mut new_key).expect("HKDF rotation failed");
+            *chain_key = new_key;
+        }
+
+        group.epoch += 1;
+        group.last_activity = Utc::now();
+
+        info!("[GroupManager] Rotation d'epoch effectuée pour le groupe {} → Epoch {}", 
+              hex::encode(&group_id[0..4]), group.epoch);
+        Ok(())
+    }
+
     pub fn get_group(&self, group_id: &[u8; 16]) -> Option<&Group> {
         self.groups.get(group_id)
     }
 
-    /// Liste tous les groupes
     pub fn list_groups(&self) -> Vec<&Group> {
         self.groups.values().collect()
     }
 
-    /// Supprime un membre du groupe
     pub fn remove_member(&mut self, group_id: &[u8; 16], node_id: &[u8; 32]) -> Result<(), GroupError> {
         let group = self.groups.get_mut(group_id).ok_or(GroupError::GroupNotFound)?;
         group.members.retain(|id| id != node_id);
-        self.sender_keys.get_mut(group_id).map(|keys| keys.remove(node_id));
+        if let Some(keys) = self.sender_keys.get_mut(group_id) {
+            keys.remove(node_id);
+        }
         Ok(())
     }
 }

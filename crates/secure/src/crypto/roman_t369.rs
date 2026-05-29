@@ -1,4 +1,4 @@
-// crates/secure/src/crypto/gematria/roman_t369.rs
+// crates/secure/src/crypto/roman_t369.rs
 // =====================================================
 // RomanT369 v5.0 — STRONG EDITION
 // 7 Rounds Roman + Roman S-Box + Dominant Post-Quantique Amélioré

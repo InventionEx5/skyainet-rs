@@ -1,6 +1,6 @@
 // crates/secure/src/contacts/manager.rs
 // =====================================================
-// ContactManager v6.2 — Version Fusionnée (Best of Both)
+// ContactManager v6.3 — Version Finale (Best of Both + DID Bonus)
 // SkyAInet × Nikola T369
 // =====================================================
 
@@ -82,22 +82,58 @@ impl ContactManager {
         }
     }
 
-    // ==================== DID (NOUVEAU) ====================
+    // ==================== DID + BONUS RÉPUTATION ====================
 
+    /// Lie un DID à un contact + applique automatiquement le bonus de réputation
     pub fn link_did_to_contact(&mut self, node_id: &[u8; 32], did: Did) -> Result<(), ContactManagerError> {
         let contact = self.contacts.get_mut(node_id).ok_or(ContactManagerError::ContactNotFound)?;
+        
         if contact.revoked {
             return Err(ContactManagerError::ContactRevoked);
         }
+
         contact.set_did(did);
+        
+        // === BONUS AUTOMATIQUE DE RÉPUTATION ===
+        if contact.has_decentralized_identity() && contact.verification_level >= 2 {
+            contact.update_reputation(12);
+            debug!(
+                "[ContactManager] +12 points de réputation accordés à {} (DID vérifié)",
+                contact.name
+            );
+        }
+
         debug!("[ContactManager] DID lié au contact {}", contact.name);
         Ok(())
     }
 
-    pub fn create_and_link_did(&mut self, node_id: &[u8; 32], public_key: Vec<u8>) -> Result<String, ContactManagerError> {
+    pub fn create_and_link_did(
+        &mut self,
+        node_id: &[u8; 32],
+        public_key: Vec<u8>,
+    ) -> Result<String, ContactManagerError> {
         let did = Did::new(public_key).map_err(|_| ContactManagerError::InvalidDid)?;
         self.link_did_to_contact(node_id, did.clone())?;
         Ok(did.to_short_string())
+    }
+
+    /// Méthode manuelle (au cas où tu veux l'appeler séparément)
+    pub fn apply_did_reputation_bonus(&mut self, node_id: &[u8; 32]) -> Result<(), ContactManagerError> {
+        let contact = self.contacts.get_mut(node_id)
+            .ok_or(ContactManagerError::ContactNotFound)?;
+
+        if !contact.has_decentralized_identity() || contact.verification_level < 2 {
+            return Err(ContactManagerError::InvalidDid);
+        }
+
+        contact.update_reputation(12);
+
+        debug!(
+            "[ContactManager] +12 points de réputation accordés manuellement à {} (DID vérifié)",
+            contact.name
+        );
+
+        Ok(())
     }
 
     pub fn get_contacts_with_did(&self) -> Vec<&Contact> {

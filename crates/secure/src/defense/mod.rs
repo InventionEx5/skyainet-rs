@@ -12,6 +12,18 @@ pub mod anti_debug;
 // RÉ-EXPORTS PRINCIPAUX
 // =====================================================
 
-pub use canvas_blocker::{CanvasBlocker, CanvasProtectionLevel, CanvasError};
-pub use decoy_circuits::{DecoyCircuitManager, DecoyCircuit};
-pub use anti_debug::{AntiDebug, AntiDebugError};   // ← À adapter selon le contenu
+pub use canvas_blocker::{
+    CanvasBlocker,
+    CanvasProtectionLevel,
+    CanvasError,
+};
+
+pub use decoy_circuits::{
+    DecoyCircuitManager,
+    DecoyCircuit,
+};
+
+pub use anti_debug::{
+    AntiDebug,
+    AntiDebugError,
+};

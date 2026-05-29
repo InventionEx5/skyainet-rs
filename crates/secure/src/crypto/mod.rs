@@ -1,35 +1,30 @@
 // crates/secure/src/crypto/mod.rs
 // =====================================================
-// SkyAInet Secure Crypto Module
+// Crypto Module — SkyAInet Secure Transport
+// Version 5.0 — Strong Edition
 // =====================================================
 
-pub mod gematria;
-pub mod hybrid;
+pub mod roman_t369;
+pub mod gematria_aead;
 pub mod kem_t369;
+pub mod hybrid;
 pub mod double_ratchet;
 pub mod dilithium;
-pub mod sha_fips;
 pub mod aes_fips;
-pub mod steganography;
+pub mod sha_fips;
 pub mod constant_time;
-pub mod roman_t369;           // ← Pour accès direct si besoin
+pub mod steganography;
 
 // =====================================================
-// RÉ-EXPORTS PRINCIPAUX (pour un usage facile)
+// Ré-exports principaux
 // =====================================================
-
-pub use gematria::roman_t369::{RomanT369, GematriaMode, RomanError};
-pub use hybrid::{HybridTransport, HybridMode, HybridError};
-pub use kem_t369::{KemT369, KemPublicKey, KemCiphertext, KemSharedSecret, KemError};
-pub use double_ratchet::{DoubleRatchet, DoubleRatchetError};
-pub use dilithium::{Dilithium5Signer, Dilithium5KeyPair, DilithiumError};
-pub use sha_fips::{Sha256Hasher, hkdf_sha256, derive_gematria_aead_keys};
-pub use aes_fips::{Aes256GcmFips, AesError};
-pub use steganography::{MarkovSteganography, StegoError};
-pub use constant_time::{
-    sample_uniform_mod,
-    add_mod,
-    sub_mod,
-    constant_time_eq,
-    constant_time_eq_fixed,
-};
+pub use roman_t369::{RomanT369, GematriaMode, RomanError};
+pub use gematria_aead::GematriaAead;
+pub use kem_t369::KemT369;
+pub use hybrid::{HybridTransport, HybridMode};
+pub use double_ratchet::DoubleRatchet;
+pub use dilithium::Dilithium5Signer;
+pub use aes_fips::Aes256GcmFips;
+pub use sha_fips::{Sha256Hasher, hkdf_sha256};
+pub use constant_time::{sample_uniform_mod, add_mod, sub_mod, constant_time_eq};
+pub use steganography::MarkovSteganography;
